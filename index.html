@@ -36,27 +36,6 @@
                 🧠 Analisar com IA
             </button>
             
-            <div class="api-key-section">
-                <label for="apiKey">Chave da OpenAI (opcional):</label>
-                <input type="password" id="apiKey" placeholder="sk-...">
-                <small>Se não preencher, usarei análise manual via prompt</small>
-            </div>
-        </div>
-
-        <div class="prompt-section" id="promptSection" style="display: none;">
-            <h3>📋 Prompt para Análise</h3>
-            <textarea id="analysisPrompt" readonly></textarea>
-            <button id="copyPromptBtn" class="copy-btn">📋 Copiar Prompt</button>
-            <div class="instructions">
-                <p><strong>Instruções:</strong> Cole este prompt no ChatGPT e cole a resposta abaixo</p>
-            </div>
-        </div>
-
-        <div class="response-section" id="responseSection" style="display: none;">
-            <h3>📝 Cole a Resposta do ChatGPT Aqui</h3>
-            <textarea id="chatgptResponse" placeholder="Cole aqui a resposta completa do ChatGPT..."></textarea>
-            <button id="processResponseBtn" class="process-btn">🔄 Processar Resposta</button>
-        </div>
 
         <div class="results-section" id="resultsSection" style="display: none;">
             <!-- Resultados serão inseridos aqui -->
