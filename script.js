@@ -1,10 +1,11 @@
-// script.js - Versão com ChatGPT direto
+// script.js - Sistema Completo com ChatGPT
 class SmartComparator {
     constructor() {
         this.pdfFile = null;
         this.excelFile = null;
         this.pdfText = '';
         this.excelData = null;
+        this.results = null;
         this.init();
     }
 
@@ -29,11 +30,28 @@ class SmartComparator {
             if (type === 'pdf') {
                 this.pdfFile = file;
                 this.pdfText = await this.extractPDFText(file);
-                previewElement.innerHTML = `<p><strong>${file.name}</strong> ✅<br><small>${file.size} bytes - Pronto para análise</small></p>`;
+                previewElement.innerHTML = `
+                    <p><strong>${file.name}</strong> ✅</p>
+                    <small>${(file.size / 1024).toFixed(1)} KB - Pronto para análise</small>
+                    <div class="debug-info">
+                        <strong>📝 Prévia do texto:</strong><br>
+                        <div style="max-height: 100px; overflow-y: auto; font-size: 0.8rem; background: #f8f9fa; padding: 5px; border-radius: 3px;">
+                            ${this.pdfText.substring(0, 200)}...
+                        </div>
+                    </div>
+                `;
             } else {
                 this.excelFile = file;
                 this.excelData = await this.extractExcelData(file);
-                previewElement.innerHTML = `<p><strong>${file.name}</strong> ✅<br><small>${file.size} bytes - Pronto para análise</small></p>`;
+                previewElement.innerHTML = `
+                    <p><strong>${file.name}</strong> ✅</p>
+                    <small>${(file.size / 1024).toFixed(1)} KB - Pronto para análise</small>
+                    <div class="debug-info">
+                        <strong>📊 Estrutura:</strong><br>
+                        Planilhas: ${this.excelData.sheetNames.join(', ')}<br>
+                        Total de linhas: ${Object.values(this.excelData.sheets).reduce((acc, sheet) => acc + sheet.length, 0)}
+                    </div>
+                `;
             }
         } catch (error) {
             console.error(`Erro ao processar ${type}:`, error);
@@ -52,7 +70,7 @@ class SmartComparator {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             const pageText = textContent.items.map(item => item.str).join(' ');
-            fullText += `Página ${i}:\n${pageText}\n\n`;
+            fullText += pageText + '\n';
         }
 
         return fullText;
@@ -67,7 +85,6 @@ class SmartComparator {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    // Extrai dados de todas as planilhas
                     const sheetsData = {};
                     workbook.SheetNames.forEach(sheetName => {
                         const worksheet = workbook.Sheets[sheetName];
@@ -105,18 +122,12 @@ class SmartComparator {
         try {
             console.log('🧠 Iniciando análise com ChatGPT...');
             
-            // Prepara os dados para o ChatGPT
             const analysisData = {
-                pdfText: this.pdfText.substring(0, 15000), // Limita para não exceder tokens
-                excelData: this.formatExcelForGPT(this.excelData),
-                fileName: this.excelData.fileName
+                pdfText: this.pdfText,
+                excelData: this.excelData
             };
 
-            // Cria o prompt para o ChatGPT
             const prompt = this.createAnalysisPrompt(analysisData);
-            
-            // Aqui você integraria com a API do ChatGPT
-            // Por enquanto, vamos simular e mostrar o prompt
             this.displayChatGPTPrompt(prompt);
             
         } catch (error) {
@@ -127,57 +138,60 @@ class SmartComparator {
         }
     }
 
-    formatExcelForGPT(excelData) {
-        let formattedData = `Arquivo: ${excelData.fileName}\n`;
-        formattedData += `Planilhas: ${excelData.sheetNames.join(', ')}\n\n`;
+    createAnalysisPrompt(data) {
+        // Formata dados do Excel para texto
+        let excelText = `ARQUIVO: ${data.excelData.fileName}\n`;
+        excelText += `PLANILHAS: ${data.excelData.sheetNames.join(', ')}\n\n`;
         
-        excelData.sheetNames.forEach(sheetName => {
-            const sheetData = excelData.sheets[sheetName];
-            formattedData += `--- Planilha: ${sheetName} ---\n`;
+        data.excelData.sheetNames.forEach(sheetName => {
+            const sheetData = data.excelData.sheets[sheetName];
+            excelText += `--- PLANILHA: ${sheetName} ---\n`;
             
-            // Pega as primeiras 20 linhas de cada planilha para análise
-            sheetData.slice(0, 20).forEach((row, index) => {
-                formattedData += `Linha ${index + 1}: ${JSON.stringify(row)}\n`;
+            // Inclui todas as linhas da planilha
+            sheetData.forEach((row, index) => {
+                if (row && row.some(cell => cell !== '' && cell != null)) {
+                    excelText += `Linha ${index + 1}: ${JSON.stringify(row)}\n`;
+                }
             });
             
-            formattedData += `\nTotal de linhas: ${sheetData.length}\n\n`;
+            excelText += `\n`;
         });
-        
-        return formattedData;
-    }
 
-    createAnalysisPrompt(data) {
         return `
-ANÁLISE DE COMPATIBILIDADE ENTRE LISTA DE MATERIAIS E ORÇAMENTO
+ANÁLISE DE COMPATIBILIDADE: LISTA DE MATERIAIS vs ORÇAMENTO
 
 CONTEXTO:
-Você é um especialista em análise de compatibilidade entre listas de materiais de projetos elétricos e planilhas de orçamento. Sua tarefa é comparar os itens do PDF (lista de materiais) com os itens do Excel (orçamento) e identificar discrepâncias.
+Você é um especialista em análise de projetos elétricos e orçamentação. Compare a lista de materiais (PDF) com a planilha de orçamento (Excel) e identifique todas as discrepâncias.
 
 DADOS DA LISTA DE MATERIAIS (PDF):
+"""
 ${data.pdfText}
+"""
 
 DADOS DO ORÇAMENTO (EXCEL):
-${data.excelData}
+"""
+${excelText}
+"""
 
 INSTRUÇÕES DETALHADAS:
 
-1. IDENTIFICAÇÃO DE ITENS:
-   - Extraia todos os materiais do texto do PDF, incluindo descrição, quantidade e unidade
-   - Identifique os materiais na planilha Excel, procurando por correspondências
+1. EXTRAÇÃO DE ITENS:
+   - Do PDF: Identifique todos os materiais com suas quantidades e unidades
+   - Do Excel: Encontre os materiais correspondentes e suas quantidades/orçamentos
 
 2. CRITÉRIOS DE COMPARAÇÃO:
-   - Compare descrições similares (não precisa ser exato, use senso comum)
-   - Verifique se as quantidades coincidem
-   - Identifique unidades de medida compatíveis
+   - Use correspondência flexível de descrições (sinônimos, abreviações)
+   - Considere unidades equivalentes (m, un, pç, mm, etc.)
+   - Priorize o sentido semântico sobre a exatidão textual
 
-3. CLASSIFICAÇÃO DOS RESULTADOS:
-   - ✅ CORRETO: Item existe em ambos com mesma quantidade
-   - ❌ DIVERGENTE: Item existe mas quantidade diferente
+3. CLASSIFICAÇÃO:
+   - ✅ CORRETO: Item existe em ambos com quantidades compatíveis
+   - ❌ DIVERGENTE: Item existe mas quantidades diferentes
    - ⚠️ FALTANDO_NO_ORCAMENTO: Item do PDF não encontrado no Excel
    - 📋 FALTANDO_NA_LISTA: Item do Excel não encontrado no PDF
 
 4. FORMATAÇÃO DA RESPOSTA:
-Responda APENAS com um JSON válido no seguinte formato:
+Responda APENAS com um JSON válido:
 
 {
   "resumo": {
@@ -187,30 +201,31 @@ Responda APENAS com um JSON válido no seguinte formato:
     "itens_divergentes": número,
     "itens_faltando_orcamento": número,
     "itens_faltando_lista": número,
-    "taxa_acerto": "porcentagem"
+    "taxa_acerto": "XX%"
   },
   "comparacao": [
     {
-      "item": "descrição do material",
-      "lista_quantidade": número,
-      "orcamento_quantidade": número,
+      "item": "descrição completa do material",
+      "lista_quantidade": número ou null,
+      "orcamento_quantidade": número ou null,
+      "unidade": "un|m|pç|etc",
       "status": "CORRETO|DIVERGENTE|FALTANDO_NO_ORCAMENTO|FALTANDO_NA_LISTA",
       "diferenca": número,
-      "observacao": "explicação detalhada"
+      "observacao": "explicação detalhada da comparação"
     }
   ],
   "recomendacoes": [
-    "lista de ações recomendadas"
+    "lista de ações recomendadas baseadas nas discrepâncias encontradas"
   ]
 }
 
 5. OBSERVAÇÕES IMPORTANTES:
-   - Seja flexível na comparação de descrições
-   - Considere sinônimos e abreviações
-   - Priorize a lógica sobre a exatidão textual
-   - Inclua observações úteis para cada item
+   - Seja minucioso na extração de itens do PDF
+   - Considere o contexto de projeto elétrico
+   - Inclua observações úteis para correção
+   - Para itens faltantes, explique onde procurar
 
-Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
+Retorne APENAS o JSON, sem texto adicional antes ou depois.
 `;
     }
 
@@ -227,24 +242,30 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
                     <p><strong>Como usar:</strong></p>
                     <ol>
                         <li>Copie o prompt acima (Ctrl+C)</li>
-                        <li>Cole no ChatGPT-4</li>
-                        <li>Cole a resposta no campo abaixo</li>
-                        <li>Clique em "Processar Resposta"</li>
+                        <li>Cole no ChatGPT-4 ou ChatGPT Plus</li>
+                        <li>Aguarde a análise completa</li>
+                        <li>Copie a resposta JSON do ChatGPT</li>
+                        <li>Cole no campo abaixo e clique em "Processar Resposta"</li>
                     </ol>
+                    <p><em>💡 Dica: Use o GPT-4 para melhor precisão na análise</em></p>
                 </div>
             </div>
 
             <div class="response-section">
                 <h3>📝 Resposta do ChatGPT</h3>
-                <textarea id="chatgptResponse" placeholder="Cole aqui a resposta do ChatGPT..."></textarea>
-                <button onclick="processGPTResponse()" class="process-btn">🔄 Processar Resposta</button>
+                <textarea id="chatgptResponse" placeholder="Cole aqui a resposta JSON do ChatGPT..."></textarea>
+                <div class="actions">
+                    <button onclick="processGPTResponse()" class="process-btn">🔄 Processar Resposta</button>
+                    <button onclick="clearResponse()" class="details-btn">🗑️ Limpar</button>
+                </div>
             </div>
 
             <div class="api-key-section">
-                <label for="apiKey">🔑 Chave da API OpenAI (opcional):</label>
-                <input type="password" id="apiKey" placeholder="sk-...">
-                <small>Se preferir análise automática via API</small>
-                <button onclick="analyzeWithAPI()" class="analyze-btn" style="margin-top: 10px;">🤖 Analisar com API</button>
+                <h4>🤖 Análise Automática (Opcional)</h4>
+                <label for="apiKey">Chave da API OpenAI:</label>
+                <input type="password" id="apiKey" placeholder="sk-..." style="width: 100%; max-width: 400px;">
+                <small>Se preferir análise automática via API (requer créditos na OpenAI)</small>
+                <button onclick="analyzeWithAPI()" class="analyze-btn" style="margin-top: 10px; padding: 10px 20px;">🚀 Analisar com API</button>
             </div>
         `;
 
@@ -252,12 +273,16 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Funções globais para os botões
+    // Funções globais
     window.copyToClipboard = (elementId) => {
         const textarea = document.getElementById(elementId);
         textarea.select();
         document.execCommand('copy');
-        alert('Prompt copiado para a área de transferência!');
+        alert('✅ Prompt copiado para a área de transferência!');
+    };
+
+    window.clearResponse = () => {
+        document.getElementById('chatgptResponse').value = '';
     };
 
     window.processGPTResponse = () => {
@@ -268,7 +293,6 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
         }
 
         try {
-            // Tenta extrair JSON da resposta (o ChatGPT às vezes adiciona texto antes/depois)
             const jsonMatch = responseText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const resultData = JSON.parse(jsonMatch[0]);
@@ -278,7 +302,7 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
             }
         } catch (error) {
             console.error('Erro ao processar resposta:', error);
-            alert('Erro ao processar a resposta. Verifique se o ChatGPT retornou um JSON válido.');
+            alert('❌ Erro ao processar a resposta. Verifique se o ChatGPT retornou um JSON válido.\n\nErro: ' + error.message);
         }
     };
 
@@ -298,7 +322,7 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
             window.processGPTResponse();
         } catch (error) {
             console.error('Erro na API:', error);
-            alert('Erro na chamada da API: ' + error.message);
+            alert('❌ Erro na chamada da API: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -320,7 +344,8 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
         });
 
         if (!response.ok) {
-            throw new Error(`Erro da API: ${response.statusText}`);
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || `Erro HTTP: ${response.status}`);
         }
 
         const data = await response.json();
@@ -328,6 +353,7 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
     }
 
     displayResults(resultData) {
+        this.results = resultData;
         const resultsSection = document.getElementById('resultsSection');
         
         let resultsHTML = `
@@ -381,10 +407,11 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
                         <tr>
                             <th width="60">Status</th>
                             <th width="300">Item</th>
-                            <th width="100">Lista (Qtd)</th>
-                            <th width="100">Orçamento (Qtd)</th>
+                            <th width="80">Unid.</th>
+                            <th width="90">Lista</th>
+                            <th width="90">Orçamento</th>
                             <th width="80">Diferença</th>
-                            <th width="200">Observação</th>
+                            <th>Observação</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -399,10 +426,11 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
             resultsHTML += `
                 <tr>
                     <td class="${statusClass}">${statusIcon}</td>
-                    <td title="${item.item}">${this.truncateText(item.item, 50)}</td>
-                    <td>${item.lista_quantidade || 0}</td>
-                    <td>${item.orcamento_quantidade || 0}</td>
-                    <td class="${differenceClass}">${item.diferenca > 0 ? '+' : ''}${item.diferenca}</td>
+                    <td title="${item.item}">${this.truncateText(item.item, 60)}</td>
+                    <td>${item.unidade || '-'}</td>
+                    <td>${item.lista_quantidade !== null ? item.lista_quantidade : '-'}</td>
+                    <td>${item.orcamento_quantidade !== null ? item.orcamento_quantidade : '-'}</td>
+                    <td class="${differenceClass}">${item.diferenca > 0 ? '+' : ''}${item.diferenca !== null ? item.diferenca : '-'}</td>
                     <td>${item.observacao}</td>
                 </tr>
             `;
@@ -420,21 +448,82 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
                 </ul>
             </div>
 
-            <div class="actions">
-                <button onclick="exportResults()" class="export-btn">📥 Exportar Resultados</button>
+            <div class="export-section">
+                <button onclick="exportResults()" class="export-btn">📥 Exportar Resultados (JSON)</button>
+                <button onclick="showRawResults()" class="details-btn">🔍 Ver Dados Completos</button>
             </div>
         `;
 
         resultsSection.innerHTML = resultsHTML;
         this.bindDynamicEvents();
         
-        // Salva os resultados para exportação
-        window.currentResults = resultData;
-        
         console.log('🎉 Resultados do ChatGPT exibidos!');
     }
 
-    // ... (mantém os métodos auxiliares existentes: getStatusClass, getStatusIcon, truncateText, bindDynamicEvents, etc.)
+    bindDynamicEvents() {
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const filter = e.target.dataset.filter;
+                
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                this.filterTable(filter);
+            });
+        });
+    }
+
+    filterTable(filter) {
+        const rows = document.querySelectorAll('#comparisonTable tbody tr');
+        
+        rows.forEach(row => {
+            const statusCell = row.cells[0];
+            const statusIcon = statusCell.textContent.trim();
+            
+            let showRow = false;
+            
+            switch (filter) {
+                case 'all':
+                    showRow = true;
+                    break;
+                case 'CORRETO':
+                    showRow = statusIcon === '✅';
+                    break;
+                case 'DIVERGENTE':
+                    showRow = statusIcon === '❌';
+                    break;
+                case 'FALTANDO':
+                    showRow = statusIcon === '⚠️' || statusIcon === '📋';
+                    break;
+            }
+            
+            row.style.display = showRow ? '' : 'none';
+        });
+    }
+
+    getStatusClass(status) {
+        const classes = {
+            'CORRETO': 'status-match',
+            'DIVERGENTE': 'status-mismatch',
+            'FALTANDO_NO_ORCAMENTO': 'status-missing',
+            'FALTANDO_NA_LISTA': 'status-extra'
+        };
+        return classes[status] || '';
+    }
+
+    getStatusIcon(status) {
+        const icons = {
+            'CORRETO': '✅',
+            'DIVERGENTE': '❌',
+            'FALTANDO_NO_ORCAMENTO': '⚠️',
+            'FALTANDO_NA_LISTA': '📋'
+        };
+        return icons[status] || '🔍';
+    }
+
+    truncateText(text, maxLength) {
+        return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    }
 
     showLoading(show) {
         document.getElementById('loading').style.display = show ? 'block' : 'none';
@@ -442,8 +531,34 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
     }
 }
 
+// Funções globais para exportação
+window.exportResults = () => {
+    if (!window.smartComparator || !window.smartComparator.results) {
+        alert('Nenhum resultado para exportar.');
+        return;
+    }
+    
+    const dataStr = JSON.stringify(window.smartComparator.results, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `analise_chatgpt_${new Date().getTime()}.json`;
+    link.click();
+};
+
+window.showRawResults = () => {
+    if (!window.smartComparator || !window.smartComparator.results) {
+        alert('Nenhum resultado disponível.');
+        return;
+    }
+    
+    alert('Dados completos disponíveis no console (F12)');
+    console.log('📊 Resultados completos:', window.smartComparator.results);
+};
+
 // Inicializa a aplicação
 document.addEventListener('DOMContentLoaded', () => {
-    new SmartComparator();
+    window.smartComparator = new SmartComparator();
     console.log('🚀 Comparador Inteligente com ChatGPT inicializado!');
 });
