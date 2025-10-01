@@ -3,104 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comparador de Lista vs Orçamento</title>
+    <title>Comparador Inteligente - Com ChatGPT</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header class="app-header">
-            <h1>🔍 Comparador de Lista vs Orçamento</h1>
-            <p>Faça upload dos arquivos para comparar a lista de materiais com o orçamento</p>
+            <h1>🔍 Comparador Inteligente</h1>
+            <p>Faça upload dos arquivos e eu analisarei as discrepâncias usando IA</p>
         </header>
 
         <div class="upload-section">
-            <div class="upload-box" id="pdfBox">
+            <div class="upload-box">
                 <h3>📄 Lista de Materiais (PDF)</h3>
                 <input type="file" id="pdfFile" accept=".pdf" class="file-input">
                 <div class="file-preview" id="pdfPreview">
                     <p>Nenhum arquivo selecionado</p>
                 </div>
-                <div class="file-info" id="pdfInfo"></div>
             </div>
             
-            <div class="upload-box" id="excelBox">
+            <div class="upload-box">
                 <h3>📊 Orçamento (Excel)</h3>
                 <input type="file" id="excelFile" accept=".xlsx,.xls" class="file-input">
                 <div class="file-preview" id="excelPreview">
                     <p>Nenhum arquivo selecionado</p>
                 </div>
-                <div class="file-info" id="excelInfo"></div>
             </div>
         </div>
 
-        <button id="compareBtn" class="compare-btn" disabled>
-            🔍 Comparar Arquivos
-        </button>
+        <div class="analysis-controls">
+            <button id="analyzeBtn" class="analyze-btn" disabled>
+                🧠 Analisar com IA
+            </button>
+            
+            <div class="api-key-section">
+                <label for="apiKey">Chave da OpenAI (opcional):</label>
+                <input type="password" id="apiKey" placeholder="sk-...">
+                <small>Se não preencher, usarei análise manual via prompt</small>
+            </div>
+        </div>
+
+        <div class="prompt-section" id="promptSection" style="display: none;">
+            <h3>📋 Prompt para Análise</h3>
+            <textarea id="analysisPrompt" readonly></textarea>
+            <button id="copyPromptBtn" class="copy-btn">📋 Copiar Prompt</button>
+            <div class="instructions">
+                <p><strong>Instruções:</strong> Cole este prompt no ChatGPT e cole a resposta abaixo</p>
+            </div>
+        </div>
+
+        <div class="response-section" id="responseSection" style="display: none;">
+            <h3>📝 Cole a Resposta do ChatGPT Aqui</h3>
+            <textarea id="chatgptResponse" placeholder="Cole aqui a resposta completa do ChatGPT..."></textarea>
+            <button id="processResponseBtn" class="process-btn">🔄 Processar Resposta</button>
+        </div>
 
         <div class="results-section" id="resultsSection" style="display: none;">
-            <div class="summary-cards">
-                <div class="card total">
-                    <h3>Total Itens</h3>
-                    <div class="number" id="totalItems">0</div>
-                </div>
-                <div class="card match">
-                    <h3>✅ Corretos</h3>
-                    <div class="number" id="matchItems">0</div>
-                </div>
-                <div class="card mismatch">
-                    <h3>❌ Discrepantes</h3>
-                    <div class="number" id="mismatchItems">0</div>
-                </div>
-                <div class="card missing">
-                    <h3>⚠️ Faltantes</h3>
-                    <div class="number" id="missingItems">0</div>
-                </div>
-            </div>
-
-            <div class="filters">
-                <button class="filter-btn active" data-filter="all">Todos</button>
-                <button class="filter-btn" data-filter="match">✅ Corretos</button>
-                <button class="filter-btn" data-filter="mismatch">❌ Discrepantes</button>
-                <button class="filter-btn" data-filter="missing">⚠️ Faltantes</button>
-                <button class="filter-btn" data-filter="extra">📋 Extras</button>
-            </div>
-
-            <div class="table-container">
-                <table id="comparisonTable">
-                    <thead>
-                        <tr>
-                            <th width="50">Status</th>
-                            <th width="300">Descrição</th>
-                            <th width="120">Lista (Qtd)</th>
-                            <th width="120">Orçamento (Qtd)</th>
-                            <th width="100">Diferença</th>
-                            <th width="80">Similaridade</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        <!-- Os resultados aparecerão aqui -->
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="export-section">
-                <button id="exportBtn" class="export-btn">📥 Exportar Resultados</button>
-            </div>
+            <!-- Resultados serão inseridos aqui -->
         </div>
 
         <div class="loading" id="loading" style="display: none;">
             <div class="spinner"></div>
-            <p>Analisando arquivos...</p>
+            <p>Processando...</p>
         </div>
     </div>
 
-    <!-- Bibliotecas externas -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <script>
-        // Configuração do PDF.js
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-    </script>
     <script src="script.js"></script>
 </body>
 </html>
