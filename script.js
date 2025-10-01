@@ -71,56 +71,148 @@ class SmartComparator {
         const lines = text.split('\n');
         
         console.log('Analisando PDF... Total de linhas:', lines.length);
-
-        // Padrões para detectar materiais
+    
+        // Padrões melhorados para detectar materiais
         const patterns = [
-            /(.+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm2|mm²)/i,
-            /(\d+[.,]\d+|\d+)\s*(m|un|pç)\s+(.+)/i,
-            /[-•]\s*(.+?)\s+(\d+[.,]\d+|\d+)/i
+            // Padrão: "DESCRIÇÃO quantidade unidade" (ex: "CABO ISOLADO PP 3 X 1,5 MM2 312.4 m")
+            /^([A-Z][A-Z\s\-\/\dX,\.]+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm2|mm²|"|°|A|KA|W|V)\s*$/i,
+            
+            // Padrão: "DESCRIÇÃO quantidade" (ex: "Curva horizontal 90° 10 pç")
+            /^([A-Za-z][A-Za-z\s\-\/\d,\.]+?)\s+(\d+[.,]\d+|\d+)\s*$/i,
+            
+            // Padrão: "- DESCRIÇÃO quantidade unidade" (ex: "- COMPOSIÇÃO PRÓPRIA")
+            /^[-•]\s*([A-Za-z][A-Za-z\s\-\/\d,\.]+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç)/i
         ];
-
+    
+        let currentCategory = '';
+        let currentSubcategory = '';
+    
         lines.forEach((line, index) => {
             const trimmed = line.trim();
-            if (!trimmed || trimmed.length < 5) return;
-
+            if (!trimmed || trimmed.length < 3) return;
+    
+            // Detecta categorias (ex: "- COMPOSIÇÃO PRÓPRIA", "- SINAPI")
+            if (trimmed.startsWith('- ') && /^[A-Z]/.test(trimmed.substring(2))) {
+                currentCategory = trimmed.substring(2).trim();
+                console.log(`📁 Categoria: ${currentCategory}`);
+                return;
+            }
+    
+            // Detecta subcategorias (ex: "METROS", "UNIDADES")
+            if (trimmed === 'METROS' || trimmed === 'UNIDADES') {
+                currentSubcategory = trimmed;
+                console.log(`📂 Subcategoria: ${currentSubcategory}`);
+                return;
+            }
+    
+            // Tenta encontrar padrões de materiais
+            let materialFound = false;
+    
             for (const pattern of patterns) {
                 const match = trimmed.match(pattern);
                 if (match) {
                     let description, quantity, unit;
-
-                    if (pattern === patterns[1]) {
-                        // Padrão: "123.45 m DESCRIÇÃO"
-                        [, quantity, unit, description] = match;
-                    } else if (pattern === patterns[2]) {
-                        // Padrão: "- DESCRIÇÃO 123"
+    
+                    if (pattern === patterns[0]) {
+                        // Padrão: "DESCRIÇÃO 123.45 un"
+                        [, description, quantity, unit] = match;
+                    } else if (pattern === patterns[1]) {
+                        // Padrão: "DESCRIÇÃO 123"
                         [, description, quantity] = match;
-                        unit = 'un';
+                        unit = this.inferUnit(description, currentSubcategory);
                     } else {
-                        // Padrão: "DESCRIÇÃO 123.45 m"
+                        // Padrão: "- DESCRIÇÃO 123 un"
                         [, description, quantity, unit] = match;
                     }
-
+    
                     description = this.cleanDescription(description);
                     quantity = this.parseQuantity(quantity);
                     unit = this.normalizeUnit(unit);
-
-                    if (description && description.length > 3 && !isNaN(quantity) && quantity > 0) {
+    
+                    // Validações mais flexíveis
+                    if (description && description.length >= 3 && !isNaN(quantity) && quantity > 0) {
                         materials.push({ 
                             description, 
                             quantity, 
                             unit, 
                             source: 'PDF',
-                            linha: index + 1
+                            linha: index + 1,
+                            categoria: currentCategory,
+                            subcategoria: currentSubcategory
                         });
                         console.log(`✅ Item detectado: "${description}" - ${quantity} ${unit}`);
+                        materialFound = true;
                         break;
                     }
                 }
             }
+    
+            // Se não encontrou com padrões, tenta uma abordagem mais simples
+            if (!materialFound) {
+                // Procura por números no final da linha
+                const numberMatch = trimmed.match(/(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm2|mm²|"|°|A|KA|W|V)?\s*$/i);
+                if (numberMatch) {
+                    const quantity = this.parseQuantity(numberMatch[1]);
+                    const unit = this.normalizeUnit(numberMatch[2]);
+                    
+                    if (!isNaN(quantity) && quantity > 0) {
+                        // Pega o texto antes do número como descrição
+                        const description = this.cleanDescription(
+                            trimmed.substring(0, numberMatch.index).trim()
+                        );
+                        
+                        if (description && description.length >= 3) {
+                            materials.push({ 
+                                description, 
+                                quantity, 
+                                unit, 
+                                source: 'PDF',
+                                linha: index + 1,
+                                categoria: currentCategory,
+                                subcategoria: currentSubcategory
+                            });
+                            console.log(`✅ Item detectado (fallback): "${description}" - ${quantity} ${unit}`);
+                        }
+                    }
+                }
+            }
         });
-
+    
         console.log(`📊 Total de itens detectados no PDF: ${materials.length}`);
+        
+        // Debug: mostra todos os itens detectados
+        materials.forEach((item, idx) => {
+            console.log(`${idx + 1}. "${item.description}" - ${item.quantity} ${item.unit}`);
+        });
+        
         return materials;
+    }
+    
+    // Novo método para inferir unidade baseado na descrição ou subcategoria
+    inferUnit(description, subcategory) {
+        const descLower = description.toLowerCase();
+        
+        // Inferir baseado na descrição
+        if (descLower.includes('metro') || descLower.includes('m ') || subcategory === 'METROS') {
+            return 'm';
+        }
+        if (descLower.includes('unidade') || descLower.includes('un ') || subcategory === 'UNIDADES') {
+            return 'un';
+        }
+        if (descLower.includes('peça') || descLower.includes('pç')) {
+            return 'pç';
+        }
+        
+        return 'un'; // padrão
+    }
+    
+    // Método cleanDescription melhorado
+    cleanDescription(desc) {
+        return desc
+            .replace(/^[-•*]\s*/, '')
+            .replace(/\s+/g, ' ')
+            .replace(/\s*,\s*/g, ', ')
+            .trim();
     }
 
     async extractExcelData(file) {
