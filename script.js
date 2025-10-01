@@ -144,69 +144,48 @@ class SmartComparator {
     }
 
     createChatGPTPrompt() {
-        return `ANÁLISE URGENTE: LISTA DE MATERIAIS vs ORÇAMENTO
-
-POR FAVOR, ANALISE ESTES DOIS ARQUIVOS E IDENTIFIQUE TODAS AS DIVERGÊNCIAS:
-
-ARQUIVO 1 - LISTA DE MATERIAIS (PDF):
-"""
-${this.pdfText}
-"""
-
-ARQUIVO 2 - ORÇAMENTO (EXCEL):
-"""
-${this.excelText}
-"""
-
-INSTRUÇÕES CRÍTICAS:
-
-1. EXTRAIA TODOS OS MATERIAIS do PDF (lista de materiais)
-2. IDENTIFIQUE OS CORRESPONDENTES no Excel (orçamento)  
-3. ENCONTRE TODAS AS DIVERGÊNCIAS:
-
-   ❌ QUANTIDADES DIFERENTES: Quando o mesmo material tem quantidades diferentes
-   ⚠️ FALTANDO NO ORÇAMENTO: Materiais do PDF que não estão no Excel
-   📋 EXTRAS NO ORÇAMENTO: Materiais do Excel que não estão no PDF
-
-4. RETORNE APENAS UMA LISTA SIMPLES COM:
-
-✅ Use este formato para CADA divergência:
-
-ITEM: [Nome completo do material]
-LISTA (PDF): [quantidade] [unidade]  
-ORÇAMENTO (Excel): [quantidade] [unidade]
-DIFERENÇA: [+/- diferença]
-STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
-
-EXEMPLOS:
-
-ITEM: CABO ISOLADO PP 3 X 1,5 MM2
-LISTA (PDF): 312.4 m
-ORÇAMENTO (Excel): 300 m  
-DIFERENÇA: -12.4
-STATUS: QUANTIDADE DIFERENTE
-
-ITEM: PLUGUE FÊMEA LUMINARIA LED
-LISTA (PDF): 268 un
-ORÇAMENTO (Excel): NÃO ENCONTRADO
-DIFERENÇA: -268
-STATUS: FALTANDO NO ORÇAMENTO
-
-ITEM: MATERIAL EXTRA EXCEL
-LISTA (PDF): NÃO ENCONTRADO
-ORÇAMENTO (Excel): 50 un
-DIFERENÇA: +50
-STATUS: EXTRA NO ORÇAMENTO
-
-NECESSITO QUE:
-
-- Seja COMPLETO na análise
-- Inclua TODOS os itens divergentes  
-- Mantenha o formato simples acima
-- Não inclua itens que estão corretos
-- Foque apenas nas divergências
-
-COMEÇE AGORA:`;
+        return `ANÁLISE RÁPIDA: LISTA DE MATERIAIS vs ORÇAMENTO
+    
+    PRECISO SABER APENAS ISSO: A LISTA DE MATERIAIS ESTÁ BATE COM O ORÇAMENTO?
+    
+    SE NÃO BATER, QUAIS ITENS ESTÃO COM PROBLEMAS?
+    
+    **INFORMAÇÕES IMPORTANTES PARA AGILIZAR:**
+    - No Excel, as DESCRIÇÕES estão na COLUNA D
+    - As UNIDADES estão na COLUNA E  
+    - Os QUANTITATIVOS estão na COLUNA F
+    
+    ARQUIVO 1 - LISTA DE MATERIAIS (PDF):
+    """
+    ${this.pdfText.substring(0, 10000)}  // Limita para não ficar muito grande
+    """
+    
+    ARQUIVO 2 - ORÇAMENTO (EXCEL):
+    """
+    ${this.excelText.substring(0, 8000)}  // Limita para não ficar muito grande
+    """
+    
+    **RESPONDA APENAS COM ESTE FORMATO SIMPLES:**
+    
+    SE TUDO BATER:
+    ✅ LISTA E ORÇAMENTO ESTÃO COMPATÍVEIS
+    
+    SE HOUVER DIVERGÊNCIAS:
+    ❌ ENCONTRADAS DIVERGÊNCIAS:
+    
+    [ITEM 1]: [Descrição breve]
+    - PDF: [quantidade] [unidade]
+    - Excel: [quantidade] [unidade] 
+    - Problema: [QUANTIDADE DIFERENTE / FALTANDO NO EXCEL / EXTRA NO EXCEL]
+    
+    [ITEM 2]: [Descrição breve]
+    - PDF: [quantidade] [unidade]
+    - Excel: [quantidade] [unidade]
+    - Problema: [QUANTIDADE DIFERENTE / FALTANDO NO EXCEL / EXTRA NO EXCEL]
+    
+    **FOCO NAS PRINCIPAIS DIVERGÊNCIAS - MÁXIMO 15 ITENS MAIS CRÍTICOS**
+    
+    NÃO PRECISA ANALISAR TUDO, APENAS OS ITENS MAIS IMPORTANTES QUE ESTÃO DIFERENTES.`;
     }
 
     displayPrompt(prompt) {
