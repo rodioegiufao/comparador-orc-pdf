@@ -32,61 +32,136 @@ class SmartComparator {
             }
         
             try {
-                // Tenta encontrar JSON na resposta - método mais robusto
-                let jsonString = responseText.trim();
+                console.log('Resposta recebida:', responseText.substring(0, 500) + '...');
                 
-                // Remove possíveis markdown code blocks
-                jsonString = jsonString.replace(/```json\s*/g, '');
-                jsonString = jsonString.replace(/```\s*/g, '');
-                
-                // Encontra o primeiro { e o último }
-                const firstBrace = jsonString.indexOf('{');
-                const lastBrace = jsonString.lastIndexOf('}');
-                
-                if (firstBrace !== -1 && lastBrace !== -1) {
-                    jsonString = jsonString.substring(firstBrace, lastBrace + 1);
-                }
-                
-                // Remove espaços em branco extras
-                jsonString = jsonString.trim();
-                
-                console.log('Tentando parse do JSON:', jsonString.substring(0, 200) + '...');
-                
-                const resultData = JSON.parse(jsonString);
+                // Tenta diferentes métodos de parsing
+                const resultData = this.parseChatGPTResponse(responseText);
                 this.displayResults(resultData);
                 
             } catch (error) {
                 console.error('Erro ao processar resposta:', error);
-                console.log('Resposta completa:', responseText);
                 
-                // Tenta análise mais agressiva
-                try {
-                    // Procura por padrão JSON mais flexível
-                    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        const cleanedJson = jsonMatch[0]
-                            .replace(/[\u2018\u2019]/g, "'")
-                            .replace(/[\u201C\u201D]/g, '"')
-                            .replace(/[“”]/g, '"');
-                        
-                        console.log('Tentando parse limpo:', cleanedJson.substring(0, 200) + '...');
-                        const resultData = JSON.parse(cleanedJson);
-                        this.displayResults(resultData);
-                        return;
-                    }
-                } catch (secondError) {
-                    console.error('Segunda tentativa falhou:', secondError);
-                }
+                alert('❌ Não consegui processar a resposta.\n\n' +
+                      'Vou tentar a análise automática como alternativa...');
                 
-                alert('❌ Não consegui processar a resposta do ChatGPT.\n\n' +
-                      'Certifique-se de que:\n' +
-                      '1. Você copiou APENAS a resposta JSON do ChatGPT\n' + 
-                      '2. Não incluiu o prompt ou outros textos\n' +
-                      '3. O JSON está completo e válido\n\n' +
-                      'Erro: ' + error.message +
-                      '\n\nUse o botão "🤖 Análise Automática" como alternativa.');
+                // Fallback para análise automática
+                this.runAutomaticAnalysis();
             }
         };
+        
+        // Novo método para parse flexível
+        parseChatGPTResponse(responseText) {
+            // Método 1: Tenta encontrar JSON
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                try {
+                    const cleanedJson = jsonMatch[0]
+                        .replace(/[\u2018\u2019]/g, "'")
+                        .replace(/[\u201C\u201D]/g, '"')
+                        .replace(/[“”]/g, '"')
+                        .replace(/```json/g, '')
+                        .replace(/```/g, '')
+                        .trim();
+                    
+                    return JSON.parse(cleanedJson);
+                } catch (e) {
+                    console.log('JSON parse falhou, tentando método de tabela...');
+                }
+            }
+        
+            // Método 2: Parse por formato de tabela/texto
+            return this.parseTableResponse(responseText);
+        }
+        
+        // Método para parse de formato de tabela
+        parseTableResponse(text) {
+            const lines = text.split('\n').filter(line => line.trim());
+            const comparison = [];
+            
+            let corretos = 0;
+            let divergentes = 0;
+            let faltandoOrcamento = 0;
+            let faltandoLista = 0;
+            
+            lines.forEach(line => {
+                line = line.trim();
+                
+                // Detecta itens por padrões comuns
+                if (line.includes('✅') || line.includes('❌') || line.includes('⚠️') || line.includes('📋')) {
+                    const statusMatch = line.match(/(✅|❌|⚠️|📋)/);
+                    if (!statusMatch) return;
+                    
+                    const statusIcon = statusMatch[1];
+                    const status = statusIcon === '✅' ? 'CORRETO' : 
+                                  statusIcon === '❌' ? 'DIVERGENTE' : 
+                                  statusIcon === '⚠️' ? 'FALTANDO_NO_ORCAMENTO' : 'FALTANDO_NA_LISTA';
+                    
+                    // Extrai quantidades
+                    const qtdMatch = line.match(/(\d+[.,]?\d*)/g);
+                    let listaQtd = null;
+                    let orcamentoQtd = null;
+                    
+                    if (qtdMatch && qtdMatch.length >= 2) {
+                        listaQtd = parseFloat(qtdMatch[0].replace(',', '.'));
+                        orcamentoQtd = parseFloat(qtdMatch[1].replace(',', '.'));
+                    } else if (qtdMatch && qtdMatch.length === 1) {
+                        if (status === 'FALTANDO_NO_ORCAMENTO') {
+                            listaQtd = parseFloat(qtdMatch[0].replace(',', '.'));
+                        } else if (status === 'FALTANDO_NA_LISTA') {
+                            orcamentoQtd = parseFloat(qtdMatch[0].replace(',', '.'));
+                        }
+                    }
+                    
+                    // Extrai descrição (remove status e quantidades)
+                    let description = line
+                        .replace(/(✅|❌|⚠️|📋)/g, '')
+                        .replace(/\d+[.,]?\d*/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    
+                    if (description) {
+                        comparison.push({
+                            item: description,
+                            lista_quantidade: listaQtd,
+                            orcamento_quantidade: orcamentoQtd,
+                            unidade: 'un',
+                            status: status,
+                            diferenca: orcamentoQtd !== null && listaQtd !== null ? orcamentoQtd - listaQtd : 
+                                      status === 'FALTANDO_NO_ORCAMENTO' ? -listaQtd : orcamentoQtd,
+                            observacao: `Analisado via ChatGPT - ${status}`
+                        });
+                        
+                        // Conta estatísticas
+                        if (status === 'CORRETO') corretos++;
+                        else if (status === 'DIVERGENTE') divergentes++;
+                        else if (status === 'FALTANDO_NO_ORCAMENTO') faltandoOrcamento++;
+                        else if (status === 'FALTANDO_NA_LISTA') faltandoLista++;
+                    }
+                }
+            });
+            
+            const totalPDF = corretos + divergentes + faltandoOrcamento;
+            const totalExcel = corretos + divergentes + faltandoLista;
+            const taxaAcerto = totalPDF > 0 ? ((corretos / totalPDF) * 100).toFixed(1) + '%' : '0%';
+            
+            return {
+                resumo: {
+                    total_itens_pdf: totalPDF,
+                    total_itens_excel: totalExcel,
+                    itens_corretos: corretos,
+                    itens_divergentes: divergentes,
+                    itens_faltando_orcamento: faltandoOrcamento,
+                    itens_faltando_lista: faltandoLista,
+                    taxa_acerto: taxaAcerto
+                },
+                comparacao: comparison,
+                recomendacoes: [
+                    `Ajustar ${divergentes} itens divergentes`,
+                    `Incluir ${faltandoOrcamento} itens faltantes no orçamento`,
+                    `Verificar ${faltandoLista} itens extras no Excel`
+                ]
+            };
+        }
 
         window.runAutomaticAnalysis = () => {
             if (!window.smartComparator) {
@@ -588,9 +663,22 @@ EXIGÊNCIAS:
 - Para FALTANDO_NA_LISTA: lista_quantidade = null, orcamento_quantidade = número  
 - Diferenca = orcamento_quantidade - lista_quantidade
 
-NÃO ACEITAREI resposta com poucos itens. Analise COMPLETAMENTE.
+FORMATO DA RESPOSTA (ESCOLHA UM):
 
-RIMPORTANTE FINAL: Sua resposta deve ser APENAS o JSON válido, sem nenhum texto adicional antes ou depois. Não inclua explicações, não use markdown, apenas o JSON puro.`;
+OPÇÃO 1 - JSON (PREFERIDO):
+{
+  \"resumo\": { ... },
+  \"comparacao\": [ ... ],
+  \"recomendacoes\": [ ... ]
+}
+
+OPÇÃO 2 - TEXTO SIMPLES (ALTERNATIVA):
+✅ CABO ISOLADO PP 3 X 1,5 MM2 - PDF: 312.4m Excel: 312.4m
+❌ CAIXA PVC 4X2 - PDF: 21un Excel: 20un
+⚠️ PLUGUE LED - PDF: 268un Excel: NÃO ENCONTRADO
+📋 ITEM EXTRA - PDF: NÃO ENCONTRADO Excel: 50un
+
+Retorne no formato que preferir, mas seja COMPLETO na análise.`;
     }
 
     displayChatGPTPrompt(prompt) {
