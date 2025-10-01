@@ -40,7 +40,39 @@
         <div class="results-section" id="resultsSection" style="display: none;">
             <!-- Prompt do ChatGPT será mostrado aqui -->
         </div>
+        <!-- Adicione esta seção DEPOIS da resultsSection no seu index.html -->
 
+        <div class="response-section" id="responseSection" style="display: none;">
+            <h3>📋 COLE A RESPOSTA DO CHATGPT AQUI</h3>
+            
+            <textarea 
+                id="chatgptResponse" 
+                placeholder="Cole aqui a resposta completa do ChatGPT após analisar os arquivos..."
+                style="width: 100%; height: 300px; padding: 15px; border: 2px solid #27ae60; border-radius: 8px; font-family: monospace; font-size: 14px; resize: vertical;"
+            ></textarea>
+            
+            <div class="response-buttons">
+                <button onclick="processChatGPTResponse()" class="process-btn">
+                    ✅ Processar Resposta do ChatGPT
+                </button>
+                <button onclick="clearResponse()" class="copy-btn" style="background: #95a5a6;">
+                    🗑️ Limpar
+                </button>
+            </div>
+            
+            <div class="instructions">
+                <p><strong>📝 INSTRUÇÕES:</strong></p>
+                <ol>
+                    <li>Cole o prompt no ChatGPT-4 e aguarde a análise completa</li>
+                    <li>Copie toda a resposta do ChatGPT e cole no campo acima</li>
+                    <li>Clique em "Processar Resposta" para ver os resultados organizados</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="results-display" id="resultsDisplay" style="display: none;">
+            <!-- Aqui serão mostrados os resultados processados -->
+        </div>
         <div class="loading" id="loading" style="display: none;">
             <div class="spinner"></div>
             <p>Preparando análise...</p>
