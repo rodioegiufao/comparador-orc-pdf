@@ -23,7 +23,7 @@ class SmartComparator {
             document.execCommand('copy');
             alert('✅ Prompt copiado para a área de transferência!');
         };
-
+    
         window.processGPTResponse = () => {
             const responseText = document.getElementById('chatgptResponse').value;
             if (!responseText.trim()) {
@@ -35,8 +35,8 @@ class SmartComparator {
                 console.log('Resposta recebida:', responseText.substring(0, 500) + '...');
                 
                 // Tenta diferentes métodos de parsing
-                const resultData = this.parseChatGPTResponse(responseText);
-                this.displayResults(resultData);
+                const resultData = window.smartComparator.parseChatGPTResponse(responseText);
+                window.smartComparator.displayResults(resultData);
                 
             } catch (error) {
                 console.error('Erro ao processar resposta:', error);
@@ -45,147 +45,10 @@ class SmartComparator {
                       'Vou tentar a análise automática como alternativa...');
                 
                 // Fallback para análise automática
-                this.runAutomaticAnalysis();
+                window.smartComparator.runAutomaticAnalysis();
             }
         };
-        
-        // Novo método para parse flexível
-        parseChatGPTResponse(responseText) {
-            // Método 1: Tenta encontrar JSON
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                try {
-                    const cleanedJson = jsonMatch[0]
-                        .replace(/[\u2018\u2019]/g, "'")
-                        .replace(/[\u201C\u201D]/g, '"')
-                        .replace(/[“”]/g, '"')
-                        .replace(/```json/g, '')
-                        .replace(/```/g, '')
-                        .trim();
-                    
-                    return JSON.parse(cleanedJson);
-                } catch (e) {
-                    console.log('JSON parse falhou, tentando método de tabela...');
-                }
-            }
-        
-            // Método 2: Parse por formato de tabela/texto
-            return this.parseTableResponse(responseText);
-        }
-        
-        // Método para parse de formato de tabela
-        parseTableResponse(text) {
-            const lines = text.split('\n').filter(line => line.trim());
-            const comparison = [];
-            
-            let corretos = 0;
-            let divergentes = 0;
-            let faltandoOrcamento = 0;
-            let faltandoLista = 0;
-            
-            lines.forEach(line => {
-                line = line.trim();
-                
-                // Detecta itens por padrões comuns
-                if (line.includes('✅') || line.includes('❌') || line.includes('⚠️') || line.includes('📋')) {
-                    const statusMatch = line.match(/(✅|❌|⚠️|📋)/);
-                    if (!statusMatch) return;
-                    
-                    const statusIcon = statusMatch[1];
-                    const status = statusIcon === '✅' ? 'CORRETO' : 
-                                  statusIcon === '❌' ? 'DIVERGENTE' : 
-                                  statusIcon === '⚠️' ? 'FALTANDO_NO_ORCAMENTO' : 'FALTANDO_NA_LISTA';
-                    
-                    // Extrai quantidades
-                    const qtdMatch = line.match(/(\d+[.,]?\d*)/g);
-                    let listaQtd = null;
-                    let orcamentoQtd = null;
-                    
-                    if (qtdMatch && qtdMatch.length >= 2) {
-                        listaQtd = parseFloat(qtdMatch[0].replace(',', '.'));
-                        orcamentoQtd = parseFloat(qtdMatch[1].replace(',', '.'));
-                    } else if (qtdMatch && qtdMatch.length === 1) {
-                        if (status === 'FALTANDO_NO_ORCAMENTO') {
-                            listaQtd = parseFloat(qtdMatch[0].replace(',', '.'));
-                        } else if (status === 'FALTANDO_NA_LISTA') {
-                            orcamentoQtd = parseFloat(qtdMatch[0].replace(',', '.'));
-                        }
-                    }
-                    
-                    // Extrai descrição (remove status e quantidades)
-                    let description = line
-                        .replace(/(✅|❌|⚠️|📋)/g, '')
-                        .replace(/\d+[.,]?\d*/g, '')
-                        .replace(/\s+/g, ' ')
-                        .trim();
-                    
-                    if (description) {
-                        comparison.push({
-                            item: description,
-                            lista_quantidade: listaQtd,
-                            orcamento_quantidade: orcamentoQtd,
-                            unidade: 'un',
-                            status: status,
-                            diferenca: orcamentoQtd !== null && listaQtd !== null ? orcamentoQtd - listaQtd : 
-                                      status === 'FALTANDO_NO_ORCAMENTO' ? -listaQtd : orcamentoQtd,
-                            observacao: `Analisado via ChatGPT - ${status}`
-                        });
-                        
-                        // Conta estatísticas
-                        if (status === 'CORRETO') corretos++;
-                        else if (status === 'DIVERGENTE') divergentes++;
-                        else if (status === 'FALTANDO_NO_ORCAMENTO') faltandoOrcamento++;
-                        else if (status === 'FALTANDO_NA_LISTA') faltandoLista++;
-                    }
-                }
-            });
-            
-            const totalPDF = corretos + divergentes + faltandoOrcamento;
-            const totalExcel = corretos + divergentes + faltandoLista;
-            const taxaAcerto = totalPDF > 0 ? ((corretos / totalPDF) * 100).toFixed(1) + '%' : '0%';
-            
-            return {
-                resumo: {
-                    total_itens_pdf: totalPDF,
-                    total_itens_excel: totalExcel,
-                    itens_corretos: corretos,
-                    itens_divergentes: divergentes,
-                    itens_faltando_orcamento: faltandoOrcamento,
-                    itens_faltando_lista: faltandoLista,
-                    taxa_acerto: taxaAcerto
-                },
-                comparacao: comparison,
-                recomendacoes: [
-                    `Ajustar ${divergentes} itens divergentes`,
-                    `Incluir ${faltandoOrcamento} itens faltantes no orçamento`,
-                    `Verificar ${faltandoLista} itens extras no Excel`
-                ]
-            };
-        }
-            
-            const totalPDF = corretos + divergentes + faltandoOrcamento;
-            const totalExcel = corretos + divergentes + faltandoLista;
-            const taxaAcerto = totalPDF > 0 ? ((corretos / totalPDF) * 100).toFixed(1) + '%' : '0%';
-            
-            return {
-                resumo: {
-                    total_itens_pdf: totalPDF,
-                    total_itens_excel: totalExcel,
-                    itens_corretos: corretos,
-                    itens_divergentes: divergentes,
-                    itens_faltando_orcamento: faltandoOrcamento,
-                    itens_faltando_lista: faltandoLista,
-                    taxa_acerto: taxaAcerto
-                },
-                comparacao: comparison,
-                recomendacoes: [
-                    `Ajustar ${divergentes} itens divergentes`,
-                    `Incluir ${faltandoOrcamento} itens faltantes no orçamento`,
-                    `Verificar ${faltandoLista} itens extras no Excel`
-                ]
-            };
-        }
-
+    
         window.runAutomaticAnalysis = () => {
             if (!window.smartComparator) {
                 alert('Sistema não inicializado.');
@@ -193,7 +56,7 @@ class SmartComparator {
             }
             window.smartComparator.runAutomaticAnalysis();
         };
-
+    
         window.testWithCompleteMockData = () => {
             const mockData = {
                 "resumo": {
@@ -276,10 +139,10 @@ class SmartComparator {
                 });
             }
             
-            this.displayResults(mockData);
+            window.smartComparator.displayResults(mockData);
             alert('✅ Teste com dados completos! ' + mockData.comparacao.length + ' itens carregados.');
         };
-
+    
         // Funções de filtro
         window.filterTable = (filter) => {
             const rows = document.querySelectorAll('#comparisonTable tbody tr');
@@ -302,7 +165,7 @@ class SmartComparator {
                 row.style.display = show ? '' : 'none';
             });
         };
-
+    
         // Funções de exportação
         window.exportToExcel = () => {
             if (!window.smartComparator || !window.smartComparator.results) {
@@ -366,7 +229,7 @@ class SmartComparator {
             
             alert('✅ Relatório exportado para Excel: ' + fileName);
         };
-
+    
         window.exportToJSON = () => {
             if (!window.smartComparator || !window.smartComparator.results) {
                 alert('Nenhum resultado para exportar.');
@@ -381,7 +244,131 @@ class SmartComparator {
             link.download = 'analise_comparativa_' + new Date().getTime() + '.json';
             link.click();
         };
-
+    
+        window.showRawData = () => {
+            if (!window.smartComparator || !window.smartComparator.results) {
+                alert('Nenhum resultado disponível.');
+                return;
+            }
+            
+            console.log('📊 Dados completos:', window.smartComparator.results);
+            alert('Dados completos disponíveis no console (F12 → Console)');
+        };
+    }
+    // Adicione estes métodos dentro da classe SmartComparator, após o método defineGlobalFunctions
+    // Novo método para parse flexível
+    parseChatGPTResponse(responseText) {
+        // Método 1: Tenta encontrar JSON
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                const cleanedJson = jsonMatch[0]
+                    .replace(/[\u2018\u2019]/g, "'")
+                    .replace(/[\u201C\u201D]/g, '"')
+                    .replace(/[“”]/g, '"')
+                    .replace(/```json/g, '')
+                    .replace(/```/g, '')
+                    .trim();
+                
+                return JSON.parse(cleanedJson);
+            } catch (e) {
+                console.log('JSON parse falhou, tentando método de tabela...');
+            }
+        }
+    
+        // Método 2: Parse por formato de tabela/texto
+        return this.parseTableResponse(responseText);
+    }
+    
+    // Método para parse de formato de tabela
+    parseTableResponse(text) {
+        const lines = text.split('\n').filter(line => line.trim());
+        const comparison = [];
+        
+        let corretos = 0;
+        let divergentes = 0;
+        let faltandoOrcamento = 0;
+        let faltandoLista = 0;
+        
+        lines.forEach(line => {
+            line = line.trim();
+            
+            // Detecta itens por padrões comuns
+            if (line.includes('✅') || line.includes('❌') || line.includes('⚠️') || line.includes('📋')) {
+                const statusMatch = line.match(/(✅|❌|⚠️|📋)/);
+                if (!statusMatch) return;
+                
+                const statusIcon = statusMatch[1];
+                const status = statusIcon === '✅' ? 'CORRETO' : 
+                              statusIcon === '❌' ? 'DIVERGENTE' : 
+                              statusIcon === '⚠️' ? 'FALTANDO_NO_ORCAMENTO' : 'FALTANDO_NA_LISTA';
+                
+                // Extrai quantidades
+                const qtdMatch = line.match(/(\d+[.,]?\d*)/g);
+                let listaQtd = null;
+                let orcamentoQtd = null;
+                
+                if (qtdMatch && qtdMatch.length >= 2) {
+                    listaQtd = parseFloat(qtdMatch[0].replace(',', '.'));
+                    orcamentoQtd = parseFloat(qtdMatch[1].replace(',', '.'));
+                } else if (qtdMatch && qtdMatch.length === 1) {
+                    if (status === 'FALTANDO_NO_ORCAMENTO') {
+                        listaQtd = parseFloat(qtdMatch[0].replace(',', '.'));
+                    } else if (status === 'FALTANDO_NA_LISTA') {
+                        orcamentoQtd = parseFloat(qtdMatch[0].replace(',', '.'));
+                    }
+                }
+                
+                // Extrai descrição (remove status e quantidades)
+                let description = line
+                    .replace(/(✅|❌|⚠️|📋)/g, '')
+                    .replace(/\d+[.,]?\d*/g, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                
+                if (description) {
+                    comparison.push({
+                        item: description,
+                        lista_quantidade: listaQtd,
+                        orcamento_quantidade: orcamentoQtd,
+                        unidade: 'un',
+                        status: status,
+                        diferenca: orcamentoQtd !== null && listaQtd !== null ? orcamentoQtd - listaQtd : 
+                                  status === 'FALTANDO_NO_ORCAMENTO' ? -listaQtd : orcamentoQtd,
+                        observacao: `Analisado via ChatGPT - ${status}`
+                    });
+                    
+                    // Conta estatísticas
+                    if (status === 'CORRETO') corretos++;
+                    else if (status === 'DIVERGENTE') divergentes++;
+                    else if (status === 'FALTANDO_NO_ORCAMENTO') faltandoOrcamento++;
+                    else if (status === 'FALTANDO_NA_LISTA') faltandoLista++;
+                }
+            }
+        });
+        
+        const totalPDF = corretos + divergentes + faltandoOrcamento;
+        const totalExcel = corretos + divergentes + faltandoLista;
+        const taxaAcerto = totalPDF > 0 ? ((corretos / totalPDF) * 100).toFixed(1) + '%' : '0%';
+        
+        return {
+            resumo: {
+                total_itens_pdf: totalPDF,
+                total_itens_excel: totalExcel,
+                itens_corretos: corretos,
+                itens_divergentes: divergentes,
+                itens_faltando_orcamento: faltandoOrcamento,
+                itens_faltando_lista: faltandoLista,
+                taxa_acerto: taxaAcerto
+            },
+            comparacao: comparison,
+            recomendacoes: [
+                `Ajustar ${divergentes} itens divergentes`,
+                `Incluir ${faltandoOrcamento} itens faltantes no orçamento`,
+                `Verificar ${faltandoLista} itens extras no Excel`
+            ]
+        };
+    }
         window.showRawData = () => {
             if (!window.smartComparator || !window.smartComparator.results) {
                 alert('Nenhum resultado disponível.');
@@ -425,7 +412,7 @@ class SmartComparator {
             this.checkFilesReady();
         }
     }
-
+    
     extractPDFItems(pdfText) {
         const items = [];
         const lines = pdfText.split('\n');
