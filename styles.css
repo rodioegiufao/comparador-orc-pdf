@@ -463,3 +463,70 @@ tbody tr:hover {
         margin: 5px 0;
     }
 }
+.no-items-view {
+    text-align: center;
+    padding: 40px;
+    background: #fff3cd;
+    border-radius: 10px;
+    border: 2px dashed #ffc107;
+}
+
+.warning-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+}
+
+.no-items-view h3 {
+    color: #856404;
+    margin-bottom: 15px;
+}
+
+.suggestions {
+    text-align: left;
+    max-width: 600px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.suggestions h4 {
+    color: #856404;
+    margin: 15px 0 10px 0;
+}
+
+.response-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+.debug-btn {
+    background: #e74c3c !important;
+}
+
+.debug-btn:hover {
+    background: #c0392b !important;
+}
+
+.debug-section {
+    margin: 15px 0;
+    text-align: left;
+}
+
+.debug-section h4 {
+    margin-bottom: 5px;
+    color: #2c3e50;
+}
+
+.debug-content {
+    background: #2d3436;
+    color: #dfe6e9;
+    padding: 10px;
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
