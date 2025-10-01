@@ -152,10 +152,14 @@ CONTEXTO:
 Você é um especialista em análise de compatibilidade entre listas de materiais de projetos elétricos e planilhas de orçamento. Sua tarefa é comparar os itens do PDF (lista de materiais) com os itens do Excel (orçamento) e identificar discrepâncias.
 
 DADOS DA LISTA DE MATERIAIS (PDF):
-${data.pdfText}
+${data.pdfText.substring(0, 5000)}...
+
+[DADOS TRUNCADOS POR LIMITE DE TOKENS - CONTINUA NO ARQUIVO ORIGINAL]
 
 DADOS DO ORÇAMENTO (EXCEL):
-${data.excelData}
+${data.excelData.substring(0, 5000)}...
+
+[DADOS TRUNCADOS POR LIMITE DE TOKENS - CONTINUA NO ARQUIVO ORIGINAL]
 
 INSTRUÇÕES DETALHADAS:
 
@@ -179,21 +183,21 @@ Responda APENAS com um JSON válido no seguinte formato:
 
 {
   "resumo": {
-    "total_itens_pdf": número,
-    "total_itens_excel": número,
-    "itens_corretos": número,
-    "itens_divergentes": número,
-    "itens_faltando_orcamento": número,
-    "itens_faltando_lista": número,
-    "taxa_acerto": "porcentagem"
+    "total_itens_pdf": 0,
+    "total_itens_excel": 0,
+    "itens_corretos": 0,
+    "itens_divergentes": 0,
+    "itens_faltando_orcamento": 0,
+    "itens_faltando_lista": 0,
+    "taxa_acerto": "0%"
   },
   "comparacao": [
     {
       "item": "descrição do material",
-      "lista_quantidade": número,
-      "orcamento_quantidade": número,
-      "status": "CORRETO|DIVERGENTE|FALTANDO_NO_ORCAMENTO|FALTANDO_NA_LISTA",
-      "diferenca": número,
+      "lista_quantidade": 0,
+      "orcamento_quantidade": 0,
+      "status": "CORRETO",
+      "diferenca": 0,
       "observacao": "explicação detalhada"
     }
   ],
@@ -207,6 +211,7 @@ Responda APENAS com um JSON válido no seguinte formato:
    - Considere sinônimos e abreviações
    - Priorize a lógica sobre a exatidão textual
    - Inclua observações úteis para cada item
+   - Se não encontrar dados suficientes, retorne um JSON com valores zerados
 
 Comece a análise agora e retorne APENAS o JSON, sem texto adicional.`;
     }
@@ -225,16 +230,19 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.`;
                     <ol>
                         <li>Copie o prompt acima (Ctrl+C)</li>
                         <li>Cole no ChatGPT-4</li>
-                        <li>Cole a resposta no campo abaixo</li>
-                        <li>Clique em "Processar Resposta"</li>
+                        <li>Aguarde a análise completa</li>
+                        <li>Copie apenas o JSON da resposta (sem o prompt)</li>
+                        <li>Cole no campo abaixo e clique em "Processar Resposta"</li>
                     </ol>
+                    <p><strong>⚠️ Importante:</strong> Cole apenas o JSON, não cole o prompt novamente!</p>
                 </div>
             </div>
 
             <div class="response-section">
-                <h3>📝 Resposta do ChatGPT</h3>
-                <textarea id="chatgptResponse" placeholder="Cole aqui a resposta do ChatGPT..."></textarea>
+                <h3>📝 Resposta do ChatGPT (Cole apenas o JSON aqui)</h3>
+                <textarea id="chatgptResponse" placeholder="Cole aqui APENAS o JSON da resposta do ChatGPT..."></textarea>
                 <button onclick="processGPTResponse()" class="process-btn">🔄 Processar Resposta</button>
+                <button onclick="showExample()" class="copy-btn" style="background: #9b59b6;">📋 Ver Exemplo</button>
             </div>
 
             <div class="api-key-section">
@@ -415,6 +423,7 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.`;
 
             <div class="actions">
                 <button onclick="exportResults()" class="export-btn">📥 Exportar Resultados</button>
+                <button onclick="showRawJSON()" class="details-btn">📄 Ver JSON Completo</button>
             </div>
         `;
 
@@ -438,7 +447,47 @@ window.copyToClipboard = function(elementId) {
     const textarea = document.getElementById(elementId);
     textarea.select();
     document.execCommand('copy');
-    alert('Prompt copiado para a área de transferência!');
+    alert('Copiado para a área de transferência!');
+};
+
+window.showExample = function() {
+    const exampleJSON = {
+        "resumo": {
+            "total_itens_pdf": 15,
+            "total_itens_excel": 18,
+            "itens_corretos": 10,
+            "itens_divergentes": 3,
+            "itens_faltando_orcamento": 2,
+            "itens_faltando_lista": 3,
+            "taxa_acerto": "66.7%"
+        },
+        "comparacao": [
+            {
+                "item": "Cabo elétrico 2,5mm²",
+                "lista_quantidade": 100,
+                "orcamento_quantidade": 100,
+                "status": "CORRETO",
+                "diferenca": 0,
+                "observacao": "Quantidades coincidem"
+            },
+            {
+                "item": "Disjuntor 25A",
+                "lista_quantidade": 15,
+                "orcamento_quantidade": 20,
+                "status": "DIVERGENTE",
+                "diferenca": -5,
+                "observacao": "Orçamento tem 5 unidades a mais"
+            }
+        ],
+        "recomendacoes": [
+            "Verificar os 2 itens faltantes no orçamento",
+            "Ajustar quantidades dos 3 itens divergentes",
+            "Analisar os 3 itens extras no orçamento"
+        ]
+    };
+    
+    document.getElementById('chatgptResponse').value = JSON.stringify(exampleJSON, null, 2);
+    alert('Exemplo de JSON carregado! Agora clique em "Processar Resposta" para testar.');
 };
 
 window.processGPTResponse = function() {
@@ -449,20 +498,32 @@ window.processGPTResponse = function() {
     }
 
     try {
-        // Tenta extrair JSON da resposta (o ChatGPT às vezes adiciona texto antes/depois)
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        // Tenta extrair JSON da resposta
+        let jsonText = responseText.trim();
+        
+        // Remove possíveis markdown code blocks
+        jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '');
+        
+        // Tenta encontrar JSON entre chaves
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            const resultData = JSON.parse(jsonMatch[0]);
-            // Chama o método da instância existente
-            if (window.smartComparator) {
-                window.smartComparator.displayResults(resultData);
-            }
-        } else {
-            throw new Error('JSON não encontrado na resposta');
+            jsonText = jsonMatch[0];
+        }
+        
+        const resultData = JSON.parse(jsonText);
+        
+        // Valida a estrutura básica do JSON
+        if (!resultData.resumo || !resultData.comparacao) {
+            throw new Error('Estrutura JSON inválida. Faltam campos obrigatórios.');
+        }
+        
+        // Chama o método da instância existente
+        if (window.smartComparator) {
+            window.smartComparator.displayResults(resultData);
         }
     } catch (error) {
         console.error('Erro ao processar resposta:', error);
-        alert('Erro ao processar a resposta. Verifique se o ChatGPT retornou um JSON válido.');
+        alert('Erro ao processar a resposta: ' + error.message + '\n\nCertifique-se de colar apenas o JSON da resposta do ChatGPT, sem o prompt original.');
     }
 };
 
@@ -529,6 +590,16 @@ window.exportResults = function() {
     link.href = URL.createObjectURL(dataBlob);
     link.download = 'resultados_analise_chatgpt.json';
     link.click();
+};
+
+window.showRawJSON = function() {
+    if (!window.currentResults) {
+        alert('Nenhum resultado para mostrar.');
+        return;
+    }
+
+    const jsonString = JSON.stringify(window.currentResults, null, 2);
+    alert('JSON Completo:\n\n' + jsonString);
 };
 
 // Inicializa a aplicação
