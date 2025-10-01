@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comparador Inteligente - Com ChatGPT</title>
+    <title>Comparador - Apenas Divergências</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header class="app-header">
-            <h1>🔍 Comparador Inteligente</h1>
-            <p>Faça upload dos arquivos e eu analisarei as discrepâncias usando IA</p>
+            <h1>🔍 Comparador de Divergências</h1>
+            <p>Faça upload dos arquivos para encontrar itens divergentes</p>
         </header>
 
         <div class="upload-section">
@@ -31,9 +31,9 @@
             </div>
         </div>
 
-        <div class="analysis-controls">
+        <div style="text-align: center; margin: 30px 0;">
             <button id="analyzeBtn" class="analyze-btn" disabled>
-                🧠 Analisar com ChatGPT
+                🔍 Buscar Divergências
             </button>
         </div>
 
@@ -43,7 +43,7 @@
 
         <div class="loading" id="loading" style="display: none;">
             <div class="spinner"></div>
-            <p>Processando...</p>
+            <p>Analisando divergências...</p>
         </div>
     </div>
 
@@ -51,7 +51,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script>
-        // Configuração do PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
     
