@@ -1,4 +1,4 @@
-// script.js - Versão ChatGPT Direto
+// script.js - Versão Corrigida
 class SmartComparator {
     constructor() {
         this.pdfFile = null;
@@ -19,8 +19,13 @@ class SmartComparator {
 
     async handleFileUpload(event, type) {
         const file = event.target.files[0];
-        if (!file) return;
+        if (!file) {
+            console.log('Nenhum arquivo selecionado para', type);
+            return;
+        }
 
+        console.log('Arquivo selecionado:', file.name, 'Tipo:', type);
+        
         const previewElement = document.getElementById(type + 'Preview');
         previewElement.innerHTML = '<p><strong>' + file.name + '</strong> - Carregando...</p>';
 
@@ -28,11 +33,13 @@ class SmartComparator {
             if (type === 'pdf') {
                 this.pdfFile = file;
                 this.pdfText = await this.extractPDFText(file);
-                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB</small>';
+                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - PDF carregado</small>';
+                console.log('PDF carregado com sucesso');
             } else {
                 this.excelFile = file;
                 this.excelText = await this.extractExcelText(file);
-                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB</small>';
+                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - Excel carregado</small>';
+                console.log('Excel carregado com sucesso');
             }
         } catch (error) {
             console.error('Erro ao processar ' + type + ':', error);
@@ -43,21 +50,29 @@ class SmartComparator {
     }
 
     async extractPDFText(file) {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-        let fullText = '';
+        console.log('Extraindo texto do PDF...');
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let fullText = '';
 
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(' ');
-            fullText += `--- Página ${i} ---\n${pageText}\n\n`;
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += `--- Página ${i} ---\n${pageText}\n\n`;
+            }
+
+            console.log('PDF extraído:', fullText.length, 'caracteres');
+            return fullText;
+        } catch (error) {
+            console.error('Erro na extração PDF:', error);
+            throw error;
         }
-
-        return fullText;
     }
 
     async extractExcelText(file) {
+        console.log('Extraindo texto do Excel...');
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             
@@ -82,23 +97,48 @@ class SmartComparator {
                         excelText += '\n';
                     });
                     
+                    console.log('Excel extraído:', excelText.length, 'caracteres');
                     resolve(excelText);
                 } catch (error) {
+                    console.error('Erro na extração Excel:', error);
                     reject(error);
                 }
             };
             
-            reader.onerror = reject;
+            reader.onerror = function(error) {
+                console.error('Erro no FileReader:', error);
+                reject(error);
+            };
+            
             reader.readAsArrayBuffer(file);
         });
     }
 
     checkFilesReady() {
         const btn = document.getElementById('analyzeBtn');
-        btn.disabled = !(this.pdfFile && this.excelFile);
+        const isReady = this.pdfFile && this.excelFile;
+        
+        console.log('Verificando arquivos:', {
+            pdf: !!this.pdfFile,
+            excel: !!this.excelFile,
+            pronto: isReady
+        });
+        
+        btn.disabled = !isReady;
+        
+        if (isReady) {
+            console.log('✅ Ambos arquivos prontos! Botão habilitado.');
+        }
     }
 
     prepareForChatGPT() {
+        console.log('Preparando prompt para ChatGPT...');
+        
+        if (!this.pdfFile || !this.excelFile) {
+            alert('❌ Por favor, carregue ambos os arquivos primeiro.');
+            return;
+        }
+
         const prompt = this.createChatGPTPrompt();
         this.displayPrompt(prompt);
     }
@@ -110,12 +150,12 @@ POR FAVOR, ANALISE ESTES DOIS ARQUIVOS E IDENTIFIQUE TODAS AS DIVERGÊNCIAS:
 
 ARQUIVO 1 - LISTA DE MATERIAIS (PDF):
 """
-${this.pdfText.substring(0, 15000)}...
+${this.pdfText}
 """
 
 ARQUIVO 2 - ORÇAMENTO (EXCEL):
 """
-${this.excelText.substring(0, 10000)}...
+${this.excelText}
 """
 
 INSTRUÇÕES CRÍTICAS:
@@ -197,8 +237,7 @@ COMEÇE AGORA:`;
                     </ol>
                     
                     <p style="color: #d35400; margin-top: 10px;">
-                        <strong>💡 DICA:</strong> O ChatGPT vai analisar DIRETAMENTE seus arquivos PDF e Excel, 
-                        sem depender da minha extração limitada!
+                        <strong>💡 DICA:</strong> O ChatGPT vai analisar DIRETAMENTE seus arquivos PDF e Excel!
                     </p>
                 </div>
             </div>
@@ -215,15 +254,11 @@ COMEÇE AGORA:`;
             alert('✅ Prompt copiado! Agora cole no ChatGPT-4.');
         };
     }
-
-    showLoading(show) {
-        document.getElementById('loading').style.display = show ? 'block' : 'none';
-        document.getElementById('analyzeBtn').disabled = show;
-    }
 }
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
-    new SmartComparator();
-    console.log('✅ Sistema ChatGPT direto inicializado!');
+    window.smartComparator = new SmartComparator();
+    window.smartComparator.init();
+    console.log('✅ Sistema inicializado!');
 });
