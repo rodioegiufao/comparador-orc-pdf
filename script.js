@@ -1,4 +1,4 @@
-// script.js - Versão com debug e parsers melhorados
+// script.js - Versão com debug visual
 class MaterialComparator {
     constructor() {
         this.pdfData = [];
@@ -28,24 +28,29 @@ class MaterialComparator {
         const previewElement = document.getElementById(`${type}Preview`);
         const infoElement = document.getElementById(`${type}Info`);
         
-        previewElement.innerHTML = `<p><strong>${file.name}</strong></p>`;
+        previewElement.innerHTML = `
+            <p><strong>${file.name}</strong></p>
+            <div class="debug-info" id="${type}Debug"></div>
+        `;
+        
         this.showLoading(true);
 
         try {
             if (type === 'pdf') {
                 this.pdfFile = file;
-                this.pdfData = await this.parsePDF(file);
-                infoElement.textContent = `Itens detectados: ${this.pdfData.length} | Tamanho: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+                const result = await this.parsePDFWithDebug(file);
+                this.pdfData = result.materials;
                 
-                // Debug: mostra primeiros itens detectados
-                console.log('PDF Data:', this.pdfData.slice(0, 5));
+                infoElement.textContent = `Itens detectados: ${this.pdfData.length}`;
+                document.getElementById('pdfDebug').innerHTML = result.debugInfo;
+                
             } else {
                 this.excelFile = file;
-                this.excelData = await this.parseExcel(file);
-                infoElement.textContent = `Itens detectados: ${this.excelData.length} | Tamanho: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+                const result = await this.parseExcelWithDebug(file);
+                this.excelData = result.materials;
                 
-                // Debug: mostra primeiros itens detectados
-                console.log('Excel Data:', this.excelData.slice(0, 5));
+                infoElement.textContent = `Itens detectados: ${this.excelData.length}`;
+                document.getElementById('excelDebug').innerHTML = result.debugInfo;
             }
         } catch (error) {
             console.error(`Erro ao processar ${type}:`, error);
@@ -56,14 +61,17 @@ class MaterialComparator {
         }
     }
 
-    // ==================== PARSER DE PDF MELHORADO ====================
-    async parsePDF(file) {
+    // ==================== PARSER DE PDF COM DEBUG ====================
+    async parsePDFWithDebug(file) {
+        const debugInfo = [];
+        
         try {
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
             let fullText = '';
 
-            console.log(`PDF tem ${pdf.numPages} páginas`);
+            debugInfo.push(`<h4>📄 Informações do PDF:</h4>`);
+            debugInfo.push(`<p>Número de páginas: ${pdf.numPages}</p>`);
 
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
@@ -71,76 +79,82 @@ class MaterialComparator {
                 const pageText = textContent.items.map(item => item.str).join(' ');
                 fullText += pageText + '\n';
                 
-                console.log(`Página ${i}: ${pageText.substring(0, 100)}...`);
+                if (i === 1) {
+                    debugInfo.push(`<p><strong>Primeira página (início):</strong><br>${pageText.substring(0, 500)}...</p>`);
+                }
             }
 
-            const materials = this.parseMaterialsFromPDFText(fullText);
-            console.log(`Total de materiais detectados no PDF: ${materials.length}`);
+            const materials = this.parseMaterialsFromPDFText(fullText, debugInfo);
             
-            if (materials.length === 0) {
-                // Se não detectou nada, mostra o texto extraído para debug
-                console.log('Texto extraído do PDF:', fullText.substring(0, 1000));
+            debugInfo.push(`<h4>🔍 Resultado da Análise:</h4>`);
+            debugInfo.push(`<p>Total de materiais detectados: <strong>${materials.length}</strong></p>`);
+            
+            if (materials.length > 0) {
+                debugInfo.push(`<div class="detected-items"><strong>Itens detectados:</strong><ul>`);
+                materials.slice(0, 10).forEach(item => {
+                    debugInfo.push(`<li>${item.description} - ${item.quantity} ${item.unit}</li>`);
+                });
+                if (materials.length > 10) {
+                    debugInfo.push(`<li>... e mais ${materials.length - 10} itens</li>`);
+                }
+                debugInfo.push(`</ul></div>`);
+            } else {
+                debugInfo.push(`<div class="no-items"><strong>Nenhum item detectado!</strong></div>`);
+                debugInfo.push(`<details><summary>Ver texto extraído completo</summary><pre>${fullText}</pre></details>`);
             }
-            
-            return materials;
+
+            return {
+                materials: materials,
+                debugInfo: debugInfo.join('')
+            };
+
         } catch (error) {
-            console.error('Erro ao parsear PDF:', error);
-            throw new Error('Falha ao ler o arquivo PDF: ' + error.message);
+            debugInfo.push(`<div class="error">Erro ao processar PDF: ${error.message}</div>`);
+            return {
+                materials: [],
+                debugInfo: debugInfo.join('')
+            };
         }
     }
 
-    parseMaterialsFromPDFText(text) {
+    parseMaterialsFromPDFText(text, debugInfo) {
         const materials = [];
-        const lines = text.split('\n');
+        const lines = text.split('\n').filter(line => line.trim().length > 0);
         
-        console.log(`Total de linhas no PDF: ${lines.length}`);
+        debugInfo.push(`<p>Total de linhas no PDF: ${lines.length}</p>`);
 
         let inMaterialsSection = false;
-        let currentSection = null;
+        let materialsSectionStart = -1;
 
+        // Procura pela seção de materiais
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             
-            // Debug: mostra linhas que parecem ser cabeçalhos
-            if (line.includes('MATERIAIS') || line.includes('Lista') || line.includes('COMPOSIÇÃO')) {
-                console.log(`Cabeçalho detectado: "${line}"`);
-            }
-
-            // Detecta seções principais - critérios mais flexíveis
             if (this.isMaterialsSection(line)) {
                 inMaterialsSection = true;
-                console.log(`Entrou na seção de materiais: "${line}"`);
-                continue;
+                materialsSectionStart = i;
+                debugInfo.push(`<p>🏁 Seção de materiais encontrada na linha ${i + 1}: "${line}"</p>`);
+                break;
             }
+        }
 
-            if (line.includes('METROS') || line.toLowerCase().includes('metros')) {
-                currentSection = 'meters';
-                continue;
-            }
+        // Se não encontrou seção específica, usa o arquivo todo
+        if (!inMaterialsSection) {
+            debugInfo.push(`<p>⚠️ Seção de materiais não encontrada. Analisando todo o documento.</p>`);
+            materialsSectionStart = 0;
+            inMaterialsSection = true;
+        }
 
-            if (line.includes('UNIDADES') || line.toLowerCase().includes('unidades')) {
-                currentSection = 'units';
-                continue;
-            }
+        // Analisa as linhas a partir da seção de materiais
+        for (let i = materialsSectionStart; i < Math.min(materialsSectionStart + 200, lines.length); i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
 
-            if (!inMaterialsSection) {
-                continue;
-            }
-
-            // Pula linhas vazias ou que são claramente cabeçalhos
-            if (!line || this.isHeaderLine(line) || this.isLikelyHeader(line)) {
-                continue;
-            }
-
-            // Tenta parsear a linha como item de material com múltiplos padrões
-            const material = this.parseMaterialLineFlexible(line, currentSection);
+            const material = this.parseMaterialLine(line);
             if (material) {
                 materials.push(material);
-                console.log(`Item detectado: "${material.description}" - ${material.quantity} ${material.unit}`);
-            } else {
-                // Debug: mostra linhas que não foram parseadas (mas estão na seção de materiais)
-                if (line.length > 10 && !this.isHeaderLine(line)) {
-                    console.log(`Linha não parseada: "${line}"`);
+                if (materials.length <= 5) {
+                    debugInfo.push(`<p>✅ Item ${materials.length}: "${material.description}" - ${material.quantity} ${material.unit}</p>`);
                 }
             }
         }
@@ -152,128 +166,52 @@ class MaterialComparator {
         const sectionKeywords = [
             'lista de materiais', 'materiais', 'composição', 'material', 
             'itens', 'componentes', 'insumos', 'LISTA DE MATERIAIS',
-            'COMPOSIÇÃO PRÓPRIA', 'SINAPI', 'METROS', 'UNIDADES'
+            'COMPOSIÇÃO PRÓPRIA', 'SINAPI', 'METROS', 'UNIDADES',
+            'Lista de materiais -', 'MATERIAIS -', 'COMPOSIÇÃO -'
         ];
         
         const lowerLine = line.toLowerCase();
         return sectionKeywords.some(keyword => lowerLine.includes(keyword.toLowerCase()));
     }
 
-    isLikelyHeader(line) {
-        return /^(DESCRIÇÃO|ITEM|QTD|QUANT|UNID|===|---|###)/i.test(line) ||
-               line.split(' ').length < 3; // Linhas muito curtas provavelmente são cabeçalhos
-    }
-
-    parseMaterialLineFlexible(line, section) {
-        // Múltiplos padrões em ordem de prioridade
-        const patterns = [
-            // Padrão 1: "DESCRIÇÃO 123.45 m" (mais comum)
-            /^([A-Za-z][^0-9\n]{10,}?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm²|mm2|"|polegada|w|kw)?\s*$/i,
+    parseMaterialLine(line) {
+        // Remove espaços extras
+        line = line.replace(/\s+/g, ' ').trim();
+        
+        // Padrão mais simples: número no final da linha
+        const simplePattern = /^(.+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm²|mm2|"|pol)?\s*$/i;
+        const match = line.match(simplePattern);
+        
+        if (match) {
+            let [, description, quantity, unit] = match;
             
-            // Padrão 2: "- DESCRIÇÃO 123.45 m" (com marcador)
-            /^[-•*]\s*([^0-9\n]{10,}?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm)?\s*$/i,
+            // Limpa a descrição
+            description = description.replace(/^[-•*]\s*/, '').trim();
             
-            // Padrão 3: "123.45 m DESCRIÇÃO" (quantidade primeiro)
-            /^(\d+[.,]\d+|\d+)\s*(m|un|pç)\s+([^0-9\n]{10,})$/i,
+            // Converte quantidade
+            quantity = parseFloat(quantity.replace(',', '.'));
             
-            // Padrão 4: "DESCRIÇÃO 123 un" (sem unidade explícita)
-            /^([A-Za-z][^0-9\n]{10,}?)\s+(\d+[.,]\d+|\d+)\s*$/,
+            // Define unidade padrão se não especificada
+            unit = unit ? this.normalizeUnit(unit) : 'un';
             
-            // Padrão 5: Para cabos específicos "CABO XXX X.X MM2"
-            /^(CABO[^0-9\n]+?MM2?)\s+(\d+[.,]\d+|\d+)\s*(m)?/i,
-            
-            // Padrão 6: "DESCRIÇÃO 123" (apenas número)
-            /^([A-Za-z][^0-9\n]{10,}?)\s+(\d+)$/,
-            
-            // Padrão 7: Linhas com unidades no meio do texto
-            /^(.+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç)\s+(.+)?$/i
-        ];
-
-        for (const pattern of patterns) {
-            const match = line.match(pattern);
-            if (match) {
-                let description, quantity, unit;
-
-                if (pattern === patterns[2]) {
-                    // Padrão com marcador
-                    [, description, quantity, unit] = match;
-                } else if (pattern === patterns[5]) {
-                    // Padrão para cabos
-                    [, description, quantity, unit] = match;
-                    unit = unit || 'm'; // Cabos geralmente são em metros
-                } else if (pattern === patterns[6] || pattern === patterns[3]) {
-                    // Padrão apenas número ou quantidade primeiro
-                    if (pattern === patterns[3]) {
-                        [, quantity, unit, description] = match;
-                    } else {
-                        [, description, quantity] = match;
-                        unit = this.inferUnit(section);
-                    }
-                } else {
-                    // Padrões normais
-                    [, description, quantity, unit] = match;
-                }
-
-                // Limpa e valida o resultado
-                description = this.cleanDescription(description);
-                quantity = this.parseQuantity(quantity);
-                unit = this.normalizeUnit(unit || this.inferUnit(section));
-
-                if (description && description.length > 5 && !isNaN(quantity) && quantity > 0) {
-                    return {
-                        description: description,
-                        quantity: quantity,
-                        unit: unit,
-                        rawLine: line
-                    };
-                }
+            // Valida: descrição deve ter pelo menos 3 caracteres, quantidade deve ser número válido
+            if (description.length >= 3 && !isNaN(quantity) && quantity > 0) {
+                return {
+                    description: description,
+                    quantity: quantity,
+                    unit: unit,
+                    rawLine: line
+                };
             }
         }
-
+        
         return null;
     }
 
-    cleanDescription(desc) {
-        if (!desc) return '';
+    // ==================== PARSER DE EXCEL COM DEBUG ====================
+    async parseExcelWithDebug(file) {
+        const debugInfo = [];
         
-        return desc
-            .replace(/^[-•*]\s*/, '')
-            .replace(/\s+/g, ' ')
-            .replace(/\s*\.$/, '') // Remove ponto final
-            .trim();
-    }
-
-    parseQuantity(qtyStr) {
-        if (typeof qtyStr === 'number') return qtyStr;
-        return parseFloat(qtyStr.toString().replace(',', '.')) || 0;
-    }
-
-    normalizeUnit(unit) {
-        if (!unit) return 'un';
-        
-        const unitMap = {
-            'm': 'm', 'metro': 'm', 'metros': 'm', 'mt': 'm',
-            'un': 'un', 'unid': 'un', 'unidade': 'un', 'unidades': 'un', 'und': 'un',
-            'pç': 'pç', 'pc': 'pç', 'peça': 'pç', 'peças': 'pç',
-            'mm': 'mm', 'milimetro': 'mm', 'mm2': 'mm²', 'mm²': 'mm²',
-            '"': 'polegada', 'polegada': 'polegada', 'pol': 'polegada',
-            'w': 'w', 'kw': 'kw'
-        };
-        
-        const normalized = unit.toLowerCase().trim();
-        return unitMap[normalized] || 'un';
-    }
-
-    inferUnit(section) {
-        return section === 'meters' ? 'm' : 'un';
-    }
-
-    isHeaderLine(line) {
-        return /^(DESCRIÇÃO|ITEM|QUANTIDADE|UNIDADE|===|---|###|Item|Descrição|Quantidade|Unidade)/i.test(line);
-    }
-
-    // ==================== PARSER DE EXCEL MELHORADO ====================
-    async parseExcel(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             
@@ -282,253 +220,167 @@ class MaterialComparator {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    console.log('Planilhas no Excel:', workbook.SheetNames);
+                    debugInfo.push(`<h4>📊 Informações do Excel:</h4>`);
+                    debugInfo.push(`<p>Planilhas encontradas: ${workbook.SheetNames.join(', ')}</p>`);
                     
                     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                     const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                     
-                    console.log('Dados brutos do Excel:', jsonData.slice(0, 10));
+                    debugInfo.push(`<p>Total de linhas: ${jsonData.length}</p>`);
                     
-                    const materials = this.parseExcelData(jsonData);
-                    console.log(`Materiais detectados no Excel: ${materials.length}`);
+                    // Mostra as primeiras linhas para debug
+                    if (jsonData.length > 0) {
+                        debugInfo.push(`<details><summary>Ver primeiras 5 linhas do Excel</summary>`);
+                        debugInfo.push(`<table class="debug-table">`);
+                        jsonData.slice(0, 5).forEach((row, index) => {
+                            debugInfo.push(`<tr><td>Linha ${index}:</td><td>${JSON.stringify(row)}</td></tr>`);
+                        });
+                        debugInfo.push(`</table></details>`);
+                    }
                     
-                    resolve(materials);
+                    const materials = this.parseExcelData(jsonData, debugInfo);
+                    
+                    debugInfo.push(`<h4>🔍 Resultado da Análise:</h4>`);
+                    debugInfo.push(`<p>Total de materiais detectados: <strong>${materials.length}</strong></p>`);
+                    
+                    if (materials.length > 0) {
+                        debugInfo.push(`<div class="detected-items"><strong>Itens detectados:</strong><ul>`);
+                        materials.slice(0, 10).forEach(item => {
+                            debugInfo.push(`<li>${item.description} - ${item.quantity} ${item.unit}</li>`);
+                        });
+                        if (materials.length > 10) {
+                            debugInfo.push(`<li>... e mais ${materials.length - 10} itens</li>`);
+                        }
+                        debugInfo.push(`</ul></div>`);
+                    } else {
+                        debugInfo.push(`<div class="no-items"><strong>Nenhum item detectado!</strong></div>`);
+                    }
+
+                    resolve({
+                        materials: materials,
+                        debugInfo: debugInfo.join('')
+                    });
+
                 } catch (error) {
-                    console.error('Erro detalhado do Excel:', error);
-                    reject(new Error('Erro ao ler arquivo Excel: ' + error.message));
+                    debugInfo.push(`<div class="error">Erro ao processar Excel: ${error.message}</div>`);
+                    resolve({
+                        materials: [],
+                        debugInfo: debugInfo.join('')
+                    });
                 }
             };
             
-            reader.onerror = () => reject(new Error('Erro ao ler arquivo Excel'));
+            reader.onerror = () => {
+                debugInfo.push(`<div class="error">Erro ao ler arquivo Excel</div>`);
+                resolve({
+                    materials: [],
+                    debugInfo: debugInfo.join('')
+                });
+            };
+            
             reader.readAsArrayBuffer(file);
         });
     }
 
-    parseExcelData(jsonData) {
+    parseExcelData(jsonData, debugInfo) {
         const materials = [];
         
         if (!jsonData || jsonData.length === 0) {
-            console.log('Excel vazio ou sem dados');
             return materials;
         }
 
-        // Encontra a linha de cabeçalho
-        const headerRowIndex = this.findHeaderRow(jsonData);
-        console.log(`Linha de cabeçalho encontrada: ${headerRowIndex}`);
-        
-        if (headerRowIndex === -1) {
-            // Tenta usar a primeira linha como dados se não encontrar cabeçalho claro
-            console.log('Nenhum cabeçalho claro encontrado, tentando parsear todas as linhas...');
-            return this.parseExcelWithoutHeader(jsonData);
-        }
-
-        const headers = jsonData[headerRowIndex].map(h => this.normalizeHeader(h));
-        console.log('Cabeçalhos detectados:', headers);
-        
-        const colMap = this.mapExcelColumns(headers);
-        console.log('Mapeamento de colunas:', colMap);
-        
-        // Processa linhas de dados
-        for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+        // Procura por linhas que parecem conter materiais
+        for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i];
-            if (!row || row.length === 0) continue;
+            if (!row || !Array.isArray(row)) continue;
 
-            const material = this.parseExcelRow(row, colMap);
-            if (material) {
-                materials.push(material);
-                console.log(`Item Excel: "${material.description}" - ${material.quantity} ${material.unit}`);
-            }
-        }
-
-        return materials;
-    }
-
-    parseExcelWithoutHeader(jsonData) {
-        const materials = [];
-        const possibleColumns = this.guessExcelColumns(jsonData);
-        
-        console.log('Tentando parsear sem cabeçalho. Colunas possíveis:', possibleColumns);
-
-        jsonData.forEach((row, index) => {
-            if (!row || row.length === 0) return;
-
-            // Tenta cada combinação possível de colunas
-            for (const colMap of possibleColumns) {
-                const material = this.parseExcelRow(row, colMap);
-                if (material && material.description && material.quantity > 0) {
-                    materials.push(material);
-                    console.log(`Item detectado (linha ${index}): "${material.description}"`);
-                    break;
-                }
-            }
-        });
-
-        return materials;
-    }
-
-    guessExcelColumns(jsonData) {
-        // Analisa as primeiras linhas para tentar adivinhar as colunas
-        const sampleRows = jsonData.slice(0, Math.min(10, jsonData.length));
-        const possibleMappings = [];
-        
-        // Padrões comuns de colunas
-        const commonPatterns = [
-            { description: 1, quantity: 4, unit: 5 }, // Padrão comum em orçamentos
-            { description: 3, quantity: 4, unit: 5 }, // Outro padrão comum
-            { description: 2, quantity: 3, unit: 4 }, 
-            { description: 0, quantity: 1, unit: 2 }  // Padrão simples
-        ];
-
-        // Testa cada padrão
-        for (const pattern of commonPatterns) {
-            let validCount = 0;
-            
-            for (const row of sampleRows) {
-                if (row && row.length > Math.max(pattern.description, pattern.quantity, pattern.unit || 0)) {
-                    const desc = row[pattern.description];
-                    const qty = row[pattern.quantity];
+            // Tenta encontrar descrição e quantidade em qualquer coluna
+            for (let descCol = 0; descCol < row.length; descCol++) {
+                const description = row[descCol];
+                if (!description || typeof description !== 'string') continue;
+                
+                // Procura por quantidade nas colunas seguintes
+                for (let qtyCol = descCol + 1; qtyCol < Math.min(descCol + 4, row.length); qtyCol++) {
+                    const quantity = row[qtyCol];
                     
-                    if (desc && typeof desc === 'string' && desc.length > 5 && 
-                        (typeof qty === 'number' || (typeof qty === 'string' && !isNaN(parseFloat(qty))))) {
-                        validCount++;
+                    if (this.isValidQuantity(quantity) && description.length > 5) {
+                        const material = {
+                            description: description.trim(),
+                            quantity: this.parseQuantity(quantity),
+                            unit: 'un', // Assume unidade como padrão
+                            rawData: row
+                        };
+                        
+                        materials.push(material);
+                        break;
                     }
                 }
             }
-            
-            if (validCount > sampleRows.length * 0.5) { // Pelo menos 50% das linhas batem
-                possibleMappings.push(pattern);
-            }
         }
 
-        return possibleMappings.length > 0 ? possibleMappings : [{ description: 3, quantity: 4, unit: 5 }];
+        return materials;
     }
 
-    findHeaderRow(jsonData) {
-        const headerKeywords = ['descrição', 'item', 'material', 'quantidade', 'qtd', 'unidade', 'und', 'descricao'];
-        
-        for (let i = 0; i < Math.min(20, jsonData.length); i++) {
-            const row = jsonData[i] || [];
-            if (row.length === 0) continue;
-            
-            const rowText = row.join(' ').toLowerCase();
-            const normalizedRow = this.normalizeText(rowText);
-            
-            const matchCount = headerKeywords.filter(keyword => 
-                normalizedRow.includes(keyword)
-            ).length;
-            
-            console.log(`Linha ${i}: "${rowText.substring(0, 50)}..." - matches: ${matchCount}`);
-            
-            if (matchCount >= 2) {
-                return i;
-            }
+    isValidQuantity(value) {
+        if (typeof value === 'number') return value > 0;
+        if (typeof value === 'string') {
+            const num = parseFloat(value.replace(',', '.'));
+            return !isNaN(num) && num > 0;
         }
-        
-        return -1;
+        return false;
     }
 
-    normalizeHeader(header) {
-        return String(header || '')
-            .toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .trim();
-    }
-
-    mapExcelColumns(headers) {
-        const mapping = {};
-        
-        headers.forEach((header, index) => {
-            const normalizedHeader = this.normalizeHeader(header);
-            
-            if (normalizedHeader.includes('descricao') || normalizedHeader.includes('item') || normalizedHeader.includes('material')) {
-                mapping.description = index;
-            } else if (normalizedHeader.includes('quantidade') || normalizedHeader.includes('qtd')) {
-                mapping.quantity = index;
-            } else if (normalizedHeader.includes('unidade') || normalizedHeader.includes('und')) {
-                mapping.unit = index;
-            }
-        });
-
-        // Garante que pelo menos description e quantity estão mapeados
-        if (mapping.description === undefined) {
-            // Tenta encontrar coluna de descrição por processo de eliminação
-            for (let i = 0; i < headers.length; i++) {
-                const header = headers[i];
-                if (header && header.length > 5 && !this.looksLikeNumber(header) && !this.looksLikeUnit(header)) {
-                    mapping.description = i;
-                    break;
-                }
-            }
-        }
-
-        if (mapping.quantity === undefined) {
-            // Tenta encontrar coluna de quantidade
-            for (let i = 0; i < headers.length; i++) {
-                const header = headers[i];
-                if (this.looksLikeNumber(header) || (header && header.length <= 5)) {
-                    mapping.quantity = i;
-                    break;
-                }
-            }
-        }
-
-        return mapping;
-    }
-
-    looksLikeNumber(text) {
-        return /^\d+([.,]\d+)?$/.test(text);
-    }
-
-    looksLikeUnit(text) {
-        return /^(m|un|pç|und|unid|kg|cm|mm)$/i.test(text);
-    }
-
-    parseExcelRow(row, colMap) {
-        const description = row[colMap.description];
-        let quantity = row[colMap.quantity];
-        const unit = row[colMap.unit];
-
-        if (!description || description === '' || quantity === undefined || quantity === null || quantity === '') {
-            return null;
-        }
-
-        // Converte quantidade para número
-        if (typeof quantity === 'string') {
-            quantity = this.parseQuantity(quantity);
-        }
-
-        // Se quantidade é 0 ou NaN, pula
-        if (isNaN(quantity) || quantity === 0) {
-            return null;
-        }
-
-        return {
-            description: String(description).trim(),
-            quantity: quantity,
-            unit: this.normalizeExcelUnit(unit),
-            rawData: row
-        };
-    }
-
-    normalizeExcelUnit(unit) {
+    // ==================== FUNÇÕES AUXILIARES ====================
+    normalizeUnit(unit) {
         if (!unit) return 'un';
-        return this.normalizeUnit(unit);
+        
+        const unitMap = {
+            'm': 'm', 'metro': 'm', 'metros': 'm', 'mt': 'm',
+            'un': 'un', 'unid': 'un', 'unidade': 'un', 'unidades': 'un', 'und': 'un',
+            'pç': 'pç', 'pc': 'pç', 'peça': 'pç', 'peças': 'pç',
+            'mm': 'mm', 'milimetro': 'mm', 'mm2': 'mm²', 'mm²': 'mm²'
+        };
+        
+        const normalized = unit.toLowerCase().trim();
+        return unitMap[normalized] || 'un';
     }
 
-    // ==================== COMPARAÇÃO ====================
+    parseQuantity(qtyStr) {
+        if (typeof qtyStr === 'number') return qtyStr;
+        return parseFloat(qtyStr.toString().replace(',', '.')) || 0;
+    }
+
+    // ==================== COMPARAÇÃO SIMPLIFICADA ====================
     async compareFiles() {
         this.showLoading(true);
         
         try {
-            console.log('Iniciando comparação...');
-            console.log(`PDF items: ${this.pdfData.length}, Excel items: ${this.excelData.length}`);
+            console.log('PDF Data:', this.pdfData);
+            console.log('Excel Data:', this.excelData);
 
             if (this.pdfData.length === 0 && this.excelData.length === 0) {
-                throw new Error('Nenhum item detectado em nenhum arquivo. Verifique os formatos.');
-            } else if (this.pdfData.length === 0) {
-                throw new Error('Nenhum item detectado no PDF. Verifique se é uma lista de materiais.');
-            } else if (this.excelData.length === 0) {
-                throw new Error('Nenhum item detectado no Excel. Verifique o formato da planilha.');
+                throw new Error(`
+                    Nenhum item detectado nos arquivos. 
+                    
+                    PDF: Verifique se é uma lista de materiais em formato de texto (não escaneado)
+                    Excel: Verifique se tem colunas com descrição e quantidade
+                    
+                    Veja as informações de debug acima para detalhes.
+                `);
+            }
+
+            // Se não detectou itens em um dos arquivos, usa dados de exemplo para teste
+            if (this.pdfData.length === 0 || this.excelData.length === 0) {
+                const useSample = confirm(`
+                    Detectamos itens em apenas um arquivo. 
+                    Deseja usar dados de exemplo para testar a comparação?
+                `);
+                
+                if (useSample) {
+                    this.generateSampleData();
+                } else {
+                    throw new Error('Compare arquivos com itens detectados em ambos.');
+                }
             }
 
             this.results = await this.compareMaterials(this.pdfData, this.excelData);
@@ -536,15 +388,180 @@ class MaterialComparator {
             
         } catch (error) {
             console.error('Erro na comparação:', error);
-            alert('Erro: ' + error.message + '\n\nVerifique o console (F12) para mais detalhes.');
+            alert(error.message);
         } finally {
             this.showLoading(false);
         }
     }
 
-    // ... (o resto do código de comparação permanece igual) ...
-    // [Mantém todo o código de compareMaterials, findBestMatch, calculateSimilarity, etc.]
+    generateSampleData() {
+        // Dados de exemplo para teste
+        if (this.pdfData.length === 0) {
+            this.pdfData = [
+                { description: "CABO ISOLADO PP 3 X 1,5 MM2", quantity: 312.4, unit: "m" },
+                { description: "ELETRODUTO FLEXÍVEL CORRUGADO 3/4", quantity: 82.9, unit: "m" },
+                { description: "CAIXA DE PASSAGEM PVC 4X2", quantity: 21, unit: "un" }
+            ];
+        }
+        
+        if (this.excelData.length === 0) {
+            this.excelData = [
+                { description: "CABO ISOLADO PP 3 X 1,5 MM2", quantity: 312.4, unit: "m" },
+                { description: "ELETRODUTO FLEXÍVEL CORRUGADO 3/4", quantity: 80, unit: "m" },
+                { description: "CAIXA PVC 4X2", quantity: 21, unit: "un" }
+            ];
+        }
+    }
 
+    async compareMaterials(pdfItems, excelItems) {
+        const results = [];
+        
+        // Comparação simples por similaridade de texto
+        pdfItems.forEach(pdfItem => {
+            let bestMatch = null;
+            let bestSimilarity = 0;
+
+            excelItems.forEach(excelItem => {
+                const similarity = this.calculateSimpleSimilarity(pdfItem.description, excelItem.description);
+                if (similarity > bestSimilarity) {
+                    bestSimilarity = similarity;
+                    bestMatch = excelItem;
+                }
+            });
+
+            if (bestMatch && bestSimilarity > 0.3) {
+                const status = pdfItem.quantity === bestMatch.quantity ? 'match' : 'mismatch';
+                results.push({
+                    description: pdfItem.description,
+                    pdfQuantity: pdfItem.quantity,
+                    excelQuantity: bestMatch.quantity,
+                    pdfUnit: pdfItem.unit,
+                    excelUnit: bestMatch.unit,
+                    status: status,
+                    similarity: bestSimilarity,
+                    difference: bestMatch.quantity - pdfItem.quantity
+                });
+            } else {
+                results.push({
+                    description: pdfItem.description,
+                    pdfQuantity: pdfItem.quantity,
+                    excelQuantity: 0,
+                    pdfUnit: pdfItem.unit,
+                    excelUnit: '',
+                    status: 'missing',
+                    similarity: 0,
+                    difference: -pdfItem.quantity
+                });
+            }
+        });
+
+        return results;
+    }
+
+    calculateSimpleSimilarity(str1, str2) {
+        if (!str1 || !str2) return 0;
+        
+        const s1 = str1.toLowerCase();
+        const s2 = str2.toLowerCase();
+        
+        if (s1 === s2) return 1.0;
+        if (s1.includes(s2) || s2.includes(s1)) return 0.8;
+        
+        const words1 = s1.split(/\s+/);
+        const words2 = s2.split(/\s+/);
+        
+        const commonWords = words1.filter(word => 
+            words2.some(w2 => w2.includes(word) || word.includes(w2))
+        );
+        
+        return commonWords.length / Math.max(words1.length, words2.length);
+    }
+
+    // ==================== INTERFACE ====================
+    displayResults() {
+        this.updateSummary();
+        this.updateTable();
+        document.getElementById('resultsSection').style.display = 'block';
+        document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    updateSummary() {
+        const stats = {
+            total: this.results.length,
+            match: this.results.filter(r => r.status === 'match').length,
+            mismatch: this.results.filter(r => r.status === 'mismatch').length,
+            missing: this.results.filter(r => r.status === 'missing').length
+        };
+
+        document.getElementById('totalItems').textContent = stats.total;
+        document.getElementById('matchItems').textContent = stats.match;
+        document.getElementById('mismatchItems').textContent = stats.mismatch;
+        document.getElementById('missingItems').textContent = stats.missing;
+    }
+
+    updateTable(filter = 'all') {
+        const tbody = document.getElementById('tableBody');
+        const filteredResults = filter === 'all' 
+            ? this.results 
+            : this.results.filter(r => r.status === filter);
+
+        tbody.innerHTML = filteredResults.map(item => `
+            <tr>
+                <td class="status-${item.status}">
+                    ${this.getStatusIcon(item.status)} ${this.getStatusText(item.status)}
+                </td>
+                <td>${item.description}</td>
+                <td>${item.pdfQuantity} ${item.pdfUnit}</td>
+                <td>${item.excelQuantity} ${item.excelUnit}</td>
+                <td class="${item.difference > 0 ? 'difference-positive' : 'difference-negative'}">
+                    ${item.difference > 0 ? '+' : ''}${item.difference}
+                </td>
+                <td class="${this.getSimilarityClass(item.similarity)}">
+                    ${(item.similarity * 100).toFixed(0)}%
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    getStatusIcon(status) {
+        const icons = { 'match': '✅', 'mismatch': '❌', 'missing': '⚠️' };
+        return icons[status] || '🔍';
+    }
+
+    getStatusText(status) {
+        const texts = { 'match': 'Correto', 'mismatch': 'Discrepante', 'missing': 'Faltante' };
+        return texts[status] || status;
+    }
+
+    getSimilarityClass(similarity) {
+        if (similarity >= 0.8) return 'similarity-high';
+        if (similarity >= 0.5) return 'similarity-medium';
+        return 'similarity-low';
+    }
+
+    filterTable(filter) {
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        this.updateTable(filter);
+    }
+
+    exportToExcel() {
+        if (!this.results.length) {
+            alert('Nenhum resultado para exportar');
+            return;
+        }
+        alert('Exportação para Excel - Em desenvolvimento');
+    }
+
+    showLoading(show) {
+        document.getElementById('loading').style.display = show ? 'block' : 'none';
+        document.getElementById('compareBtn').disabled = show;
+    }
+
+    checkFilesReady() {
+        const btn = document.getElementById('compareBtn');
+        btn.disabled = !(this.pdfFile && this.excelFile);
+    }
 }
 
 // Inicializa a aplicação
