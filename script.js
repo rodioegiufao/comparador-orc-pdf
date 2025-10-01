@@ -1,4 +1,4 @@
-// script.js - Versão com ChatGPT direto
+// script.js - Versão com ChatGPT direto (CORRIGIDA)
 class SmartComparator {
     constructor() {
         this.pdfFile = null;
@@ -22,22 +22,22 @@ class SmartComparator {
         const file = event.target.files[0];
         if (!file) return;
 
-        const previewElement = document.getElementById(`${type}Preview`);
-        previewElement.innerHTML = `<p><strong>${file.name}</strong> - Carregando...</p>`;
+        const previewElement = document.getElementById(type + 'Preview');
+        previewElement.innerHTML = '<p><strong>' + file.name + '</strong> - Carregando...</p>';
 
         try {
             if (type === 'pdf') {
                 this.pdfFile = file;
                 this.pdfText = await this.extractPDFText(file);
-                previewElement.innerHTML = `<p><strong>${file.name}</strong> ✅<br><small>${file.size} bytes - Pronto para análise</small></p>`;
+                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅<br><small>' + file.size + ' bytes - Pronto para análise</small></p>';
             } else {
                 this.excelFile = file;
                 this.excelData = await this.extractExcelData(file);
-                previewElement.innerHTML = `<p><strong>${file.name}</strong> ✅<br><small>${file.size} bytes - Pronto para análise</small></p>`;
+                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅<br><small>' + file.size + ' bytes - Pronto para análise</small></p>';
             }
         } catch (error) {
-            console.error(`Erro ao processar ${type}:`, error);
-            previewElement.innerHTML = `<p><strong>${file.name}</strong> ❌ Erro: ${error.message}</p>`;
+            console.error('Erro ao processar ' + type + ':', error);
+            previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ❌ Erro: ' + error.message + '</p>';
         } finally {
             this.checkFilesReady();
         }
@@ -51,8 +51,8 @@ class SmartComparator {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(' ');
-            fullText += `Página ${i}:\n${pageText}\n\n`;
+            const pageText = textContent.items.map(function(item) { return item.str; }).join(' ');
+            fullText += 'Página ' + i + ':\n' + pageText + '\n\n';
         }
 
         return fullText;
@@ -62,14 +62,14 @@ class SmartComparator {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             
-            reader.onload = (e) => {
+            reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
                     // Extrai dados de todas as planilhas
                     const sheetsData = {};
-                    workbook.SheetNames.forEach(sheetName => {
+                    workbook.SheetNames.forEach(function(sheetName) {
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
                         sheetsData[sheetName] = jsonData;
@@ -115,8 +115,7 @@ class SmartComparator {
             // Cria o prompt para o ChatGPT
             const prompt = this.createAnalysisPrompt(analysisData);
             
-            // Aqui você integraria com a API do ChatGPT
-            // Por enquanto, vamos simular e mostrar o prompt
+            // Mostra o prompt para o usuário
             this.displayChatGPTPrompt(prompt);
             
         } catch (error) {
@@ -128,27 +127,26 @@ class SmartComparator {
     }
 
     formatExcelForGPT(excelData) {
-        let formattedData = `Arquivo: ${excelData.fileName}\n`;
-        formattedData += `Planilhas: ${excelData.sheetNames.join(', ')}\n\n`;
+        let formattedData = 'Arquivo: ' + excelData.fileName + '\n';
+        formattedData += 'Planilhas: ' + excelData.sheetNames.join(', ') + '\n\n';
         
-        excelData.sheetNames.forEach(sheetName => {
+        excelData.sheetNames.forEach(function(sheetName) {
             const sheetData = excelData.sheets[sheetName];
-            formattedData += `--- Planilha: ${sheetName} ---\n`;
+            formattedData += '--- Planilha: ' + sheetName + ' ---\n';
             
             // Pega as primeiras 20 linhas de cada planilha para análise
-            sheetData.slice(0, 20).forEach((row, index) => {
-                formattedData += `Linha ${index + 1}: ${JSON.stringify(row)}\n`;
+            sheetData.slice(0, 20).forEach(function(row, index) {
+                formattedData += 'Linha ' + (index + 1) + ': ' + JSON.stringify(row) + '\n';
             });
             
-            formattedData += `\nTotal de linhas: ${sheetData.length}\n\n`;
+            formattedData += '\nTotal de linhas: ' + sheetData.length + '\n\n';
         });
         
         return formattedData;
     }
 
     createAnalysisPrompt(data) {
-        return `
-ANÁLISE DE COMPATIBILIDADE ENTRE LISTA DE MATERIAIS E ORÇAMENTO
+        return `ANÁLISE DE COMPATIBILIDADE ENTRE LISTA DE MATERIAIS E ORÇAMENTO
 
 CONTEXTO:
 Você é um especialista em análise de compatibilidade entre listas de materiais de projetos elétricos e planilhas de orçamento. Sua tarefa é comparar os itens do PDF (lista de materiais) com os itens do Excel (orçamento) e identificar discrepâncias.
@@ -210,8 +208,7 @@ Responda APENAS com um JSON válido no seguinte formato:
    - Priorize a lógica sobre a exatidão textual
    - Inclua observações úteis para cada item
 
-Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
-`;
+Comece a análise agora e retorne APENAS o JSON, sem texto adicional.`;
     }
 
     displayChatGPTPrompt(prompt) {
@@ -252,79 +249,75 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Funções globais para os botões
-    window.copyToClipboard = (elementId) => {
-        const textarea = document.getElementById(elementId);
-        textarea.select();
-        document.execCommand('copy');
-        alert('Prompt copiado para a área de transferência!');
-    };
+    // Métodos auxiliares
+    getStatusClass(status) {
+        const statusMap = {
+            'CORRETO': 'status-match',
+            'DIVERGENTE': 'status-mismatch', 
+            'FALTANDO_NO_ORCAMENTO': 'status-missing',
+            'FALTANDO_NA_LISTA': 'status-extra'
+        };
+        return statusMap[status] || 'status-missing';
+    }
 
-    window.processGPTResponse = () => {
-        const responseText = document.getElementById('chatgptResponse').value;
-        if (!responseText.trim()) {
-            alert('Por favor, cole a resposta do ChatGPT primeiro.');
-            return;
-        }
+    getStatusIcon(status) {
+        const iconMap = {
+            'CORRETO': '✅',
+            'DIVERGENTE': '❌',
+            'FALTANDO_NO_ORCAMENTO': '⚠️',
+            'FALTANDO_NA_LISTA': '📋'
+        };
+        return iconMap[status] || '❓';
+    }
 
-        try {
-            // Tenta extrair JSON da resposta (o ChatGPT às vezes adiciona texto antes/depois)
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const resultData = JSON.parse(jsonMatch[0]);
-                this.displayResults(resultData);
-            } else {
-                throw new Error('JSON não encontrado na resposta');
-            }
-        } catch (error) {
-            console.error('Erro ao processar resposta:', error);
-            alert('Erro ao processar a resposta. Verifique se o ChatGPT retornou um JSON válido.');
-        }
-    };
+    truncateText(text, maxLength) {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
 
-    window.analyzeWithAPI = async () => {
-        const apiKey = document.getElementById('apiKey').value;
-        if (!apiKey) {
-            alert('Por favor, insira sua chave da API OpenAI.');
-            return;
-        }
-
-        this.showLoading(true);
-        
-        try {
-            const prompt = document.getElementById('analysisPrompt').value;
-            const response = await this.callOpenAIAPI(apiKey, prompt);
-            document.getElementById('chatgptResponse').value = response;
-            window.processGPTResponse();
-        } catch (error) {
-            console.error('Erro na API:', error);
-            alert('Erro na chamada da API: ' + error.message);
-        } finally {
-            this.showLoading(false);
-        }
-    };
-
-    async callOpenAIAPI(apiKey, prompt) {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0.1,
-                max_tokens: 4000
-            })
+    bindDynamicEvents() {
+        // Adiciona eventos aos botões de filtro
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        filterButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const filter = e.target.getAttribute('data-filter');
+                this.filterTable(filter);
+                
+                // Atualiza estado ativo dos botões
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+            });
         });
+    }
 
-        if (!response.ok) {
-            throw new Error(`Erro da API: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        return data.choices[0].message.content;
+    filterTable(filter) {
+        const rows = document.querySelectorAll('#comparisonTable tbody tr');
+        
+        rows.forEach(row => {
+            const statusCell = row.querySelector('td:first-child');
+            const status = statusCell.textContent.trim();
+            
+            let show = false;
+            
+            switch(filter) {
+                case 'all':
+                    show = true;
+                    break;
+                case 'CORRETO':
+                    show = status === '✅';
+                    break;
+                case 'DIVERGENTE':
+                    show = status === '❌';
+                    break;
+                case 'FALTANDO':
+                    show = status === '⚠️' || status === '📋';
+                    break;
+                default:
+                    show = true;
+            }
+            
+            row.style.display = show ? '' : 'none';
+        });
     }
 
     displayResults(resultData) {
@@ -416,7 +409,7 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
             <div class="recommendations">
                 <h3>💡 Recomendações do ChatGPT</h3>
                 <ul>
-                    ${resultData.recomendacoes.map(rec => `<li>${rec}</li>`).join('')}
+                    ${resultData.recomendacoes.map(rec => '<li>' + rec + '</li>').join('')}
                 </ul>
             </div>
 
@@ -434,16 +427,112 @@ Comece a análise agora e retorne APENAS o JSON, sem texto adicional.
         console.log('🎉 Resultados do ChatGPT exibidos!');
     }
 
-    // ... (mantém os métodos auxiliares existentes: getStatusClass, getStatusIcon, truncateText, bindDynamicEvents, etc.)
-
     showLoading(show) {
         document.getElementById('loading').style.display = show ? 'block' : 'none';
         document.getElementById('analyzeBtn').disabled = show;
     }
 }
 
+// Funções globais para os botões
+window.copyToClipboard = function(elementId) {
+    const textarea = document.getElementById(elementId);
+    textarea.select();
+    document.execCommand('copy');
+    alert('Prompt copiado para a área de transferência!');
+};
+
+window.processGPTResponse = function() {
+    const responseText = document.getElementById('chatgptResponse').value;
+    if (!responseText.trim()) {
+        alert('Por favor, cole a resposta do ChatGPT primeiro.');
+        return;
+    }
+
+    try {
+        // Tenta extrair JSON da resposta (o ChatGPT às vezes adiciona texto antes/depois)
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const resultData = JSON.parse(jsonMatch[0]);
+            // Chama o método da instância existente
+            if (window.smartComparator) {
+                window.smartComparator.displayResults(resultData);
+            }
+        } else {
+            throw new Error('JSON não encontrado na resposta');
+        }
+    } catch (error) {
+        console.error('Erro ao processar resposta:', error);
+        alert('Erro ao processar a resposta. Verifique se o ChatGPT retornou um JSON válido.');
+    }
+};
+
+window.analyzeWithAPI = async function() {
+    const apiKey = document.getElementById('apiKey').value;
+    if (!apiKey) {
+        alert('Por favor, insira sua chave da API OpenAI.');
+        return;
+    }
+
+    if (window.smartComparator) {
+        window.smartComparator.showLoading(true);
+    }
+    
+    try {
+        const prompt = document.getElementById('analysisPrompt').value;
+        const response = await window.smartComparator.callOpenAIAPI(apiKey, prompt);
+        document.getElementById('chatgptResponse').value = response;
+        window.processGPTResponse();
+    } catch (error) {
+        console.error('Erro na API:', error);
+        alert('Erro na chamada da API: ' + error.message);
+    } finally {
+        if (window.smartComparator) {
+            window.smartComparator.showLoading(false);
+        }
+    }
+};
+
+// Adiciona o método callOpenAIAPI à classe
+SmartComparator.prototype.callOpenAIAPI = async function(apiKey, prompt) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({
+            model: 'gpt-4',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.1,
+            max_tokens: 4000
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('Erro da API: ' + response.statusText);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+};
+
+window.exportResults = function() {
+    if (!window.currentResults) {
+        alert('Nenhum resultado para exportar.');
+        return;
+    }
+
+    const dataStr = JSON.stringify(window.currentResults, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = 'resultados_analise_chatgpt.json';
+    link.click();
+};
+
 // Inicializa a aplicação
-document.addEventListener('DOMContentLoaded', () => {
-    new SmartComparator();
+document.addEventListener('DOMContentLoaded', function() {
+    window.smartComparator = new SmartComparator();
     console.log('🚀 Comparador Inteligente com ChatGPT inicializado!');
 });
