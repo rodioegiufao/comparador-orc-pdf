@@ -266,38 +266,74 @@ function processChatGPTResponse() {
 function displayProcessedResults(responseText) {
     const resultsDisplay = document.getElementById('resultsDisplay');
     
+    // Processar a resposta para extrair informações
     const totalItems = (responseText.match(/ITEM:/g) || []).length;
     const divergencias = (responseText.match(/STATUS:.*QUANTIDADE DIFERENTE/g) || []).length;
     const faltantes = (responseText.match(/STATUS:.*FALTANDO/g) || []).length;
     const extras = (responseText.match(/STATUS:.*EXTRA/g) || []).length;
     
+    // Extrair o status geral
+    let statusGeral = 'DIVERGÊNCIAS ENCONTRADAS';
+    if (responseText.includes('COMPATÍVEL') || responseText.includes('COMPATIVEL') || totalItems === 0) {
+        statusGeral = 'COMPATÍVEL';
+    }
+    
+    // Criar tabela com os itens processados
+    const tableRows = parseResponseToTable(responseText);
+    
     resultsDisplay.innerHTML = `
         <div class="results-section">
             <h3>📊 RESULTADOS DA ANÁLISE</h3>
             
-            <div class="summary-cards">
-                <div class="card total">
-                    <h3>TOTAL ITENS</h3>
-                    <div class="number">${totalItems}</div>
-                </div>
-                <div class="card mismatch">
-                    <h3>DIVERGÊNCIAS</h3>
-                    <div class="number">${divergencias}</div>
-                </div>
-                <div class="card missing">
-                    <h3>FALTANTES</h3>
-                    <div class="number">${faltantes}</div>
-                </div>
-                <div class="card match">
-                    <h3>EXTRAS</h3>
-                    <div class="number">${extras}</div>
+            <div class="analysis-info">
+                <h3>🔍 STATUS GERAL: ${statusGeral}</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Total de Itens com Divergência:</strong> ${totalItems}
+                    </div>
+                    <div class="info-item">
+                        <strong>Quantidades Diferentes:</strong> ${divergencias}
+                    </div>
+                    <div class="info-item">
+                        <strong>Faltantes no Orçamento:</strong> ${faltantes}
+                    </div>
+                    <div class="info-item">
+                        <strong>Extras no Orçamento:</strong> ${extras}
+                    </div>
                 </div>
             </div>
             
+            ${totalItems > 0 ? `
             <div class="analysis-info">
-                <h3>📋 DETALHES DA ANÁLISE</h3>
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
-                    <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px; max-height: 500px; overflow-y: auto;">${responseText}</pre>
+                <h3>📋 DETALHES DAS DIVERGÊNCIAS</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Lista (PDF)</th>
+                                <th>Orçamento (Excel)</th>
+                                <th>Diferença</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            ` : `
+            <div class="analysis-info" style="background: #d4edda; border-left: 4px solid #28a745;">
+                <h3 style="color: #155724;">✅ TODOS OS ITENS ESTÃO COMPATÍVEIS!</h3>
+                <p>Nenhuma divergência encontrada entre a lista de materiais e o orçamento.</p>
+            </div>
+            `}
+            
+            <div class="analysis-info">
+                <h3>📝 RESPOSTA COMPLETA DO CHATGPT</h3>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; max-height: 400px; overflow-y: auto;">
+                    <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px; margin: 0;">${responseText}</pre>
                 </div>
             </div>
             
@@ -306,13 +342,87 @@ function displayProcessedResults(responseText) {
                     📊 Exportar para Excel
                 </button>
                 <button onclick="generateReport()" class="export-btn" style="background: #9b59b6;">
-                    📄 Gerar Relatório
+                    📄 Gerar Relatório PDF
+                </button>
+                <button onclick="copyResults()" class="export-btn" style="background: #3498db;">
+                    📋 Copiar Resultados
                 </button>
             </div>
         </div>
     `;
     
     resultsDisplay.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Função melhorada para parsear a resposta
+function parseResponseToTable(text) {
+    const lines = text.split('\n');
+    let tableRows = '';
+    let currentItem = {};
+    let itemsProcessed = 0;
+    
+    lines.forEach(line => {
+        line = line.trim();
+        
+        if (line.startsWith('ITEM:')) {
+            // Se já temos um item completo, adiciona à tabela
+            if (currentItem.item && itemsProcessed < 50) { // Limite de 50 itens para não sobrecarregar
+                tableRows += createTableRow(currentItem);
+                itemsProcessed++;
+            }
+            currentItem = { item: line.replace('ITEM:', '').trim() };
+        } 
+        else if (line.startsWith('LISTA (PDF):')) {
+            currentItem.lista = line.replace('LISTA (PDF):', '').trim();
+        }
+        else if (line.startsWith('ORÇAMENTO (Excel):')) {
+            currentItem.orçamento = line.replace('ORÇAMENTO (Excel):', '').trim();
+        }
+        else if (line.startsWith('DIFERENÇA:')) {
+            currentItem.diferenca = line.replace('DIFERENÇA:', '').trim();
+        }
+        else if (line.startsWith('STATUS:')) {
+            currentItem.status = line.replace('STATUS:', '').trim();
+        }
+    });
+    
+    // Adicionar o último item se existir
+    if (currentItem.item && itemsProcessed < 50) {
+        tableRows += createTableRow(currentItem);
+    }
+    
+    return tableRows || '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #666;">Nenhuma divergência detalhada encontrada na resposta.</td></tr>';
+}
+
+function createTableRow(item) {
+    const statusClass = getStatusClass(item.status);
+    const diffClass = item.diferenca && item.diferenca.includes('+') ? 'difference-positive' : 'difference-negative';
+    
+    return `
+        <tr>
+            <td><strong>${item.item || 'N/A'}</strong></td>
+            <td>${item.lista || 'N/A'}</td>
+            <td>${item.orçamento || 'N/A'}</td>
+            <td class="${diffClass}">${item.diferenca || 'N/A'}</td>
+            <td class="status-${statusClass}">${item.status || 'N/A'}</td>
+        </tr>
+    `;
+}
+
+function getStatusClass(status) {
+    if (!status) return 'missing';
+    if (status.includes('QUANTIDADE DIFERENTE')) return 'mismatch';
+    if (status.includes('FALTANDO')) return 'missing';
+    if (status.includes('EXTRA')) return 'extra';
+    return 'missing';
+}
+
+// Nova função para copiar resultados
+function copyResults() {
+    const responseText = document.getElementById('chatgptResponse').value;
+    navigator.clipboard.writeText(responseText).then(() => {
+        alert('✅ Resultados copiados para a área de transferência!');
+    });
 }
 
 function clearResponse() {
