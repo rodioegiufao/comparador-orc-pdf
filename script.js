@@ -1,4 +1,4 @@
-// script.js - Sistema com análise automática
+// script.js - Sistema com análise automática (CORRIGIDO)
 class SmartComparator {
     constructor() {
         this.pdfItems = [];
@@ -12,13 +12,13 @@ class SmartComparator {
     }
 
     bindEvents() {
+        // Eventos que existem desde o início
         document.getElementById('pdfFile').addEventListener('change', (e) => this.handleFileUpload(e, 'pdf'));
         document.getElementById('excelFile').addEventListener('change', (e) => this.handleFileUpload(e, 'excel'));
         document.getElementById('analyzeBtn').addEventListener('click', () => this.analyzeFiles());
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.filterTable(e.target.dataset.filter));
-        });
-        document.getElementById('exportResultsBtn').addEventListener('click', () => this.exportResults());
+        
+        // Eventos de filtro - adicionamos depois quando os elementos forem criados
+        // document.getElementById('exportResultsBtn') será adicionado depois
     }
 
     async handleFileUpload(event, type) {
@@ -44,7 +44,7 @@ class SmartComparator {
             }
         } catch (error) {
             console.error(`Erro ao processar ${type}:`, error);
-            previewElement.innerHTML = `<p><strong>${file.name}</strong> ❌ Erro</p>`;
+            previewElement.innerHTML = `<p><strong>${file.name}</strong> ❌ Erro: ${error.message}</p>`;
         } finally {
             this.showLoading(false);
             this.checkFilesReady();
@@ -70,14 +70,16 @@ class SmartComparator {
         const materials = [];
         const lines = text.split('\n');
         
+        console.log('Analisando PDF... Total de linhas:', lines.length);
+
         // Padrões para detectar materiais
         const patterns = [
-            /(.+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm)/i,
+            /(.+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm2|mm²)/i,
             /(\d+[.,]\d+|\d+)\s*(m|un|pç)\s+(.+)/i,
             /[-•]\s*(.+?)\s+(\d+[.,]\d+|\d+)/i
         ];
 
-        lines.forEach(line => {
+        lines.forEach((line, index) => {
             const trimmed = line.trim();
             if (!trimmed || trimmed.length < 5) return;
 
@@ -87,11 +89,14 @@ class SmartComparator {
                     let description, quantity, unit;
 
                     if (pattern === patterns[1]) {
+                        // Padrão: "123.45 m DESCRIÇÃO"
                         [, quantity, unit, description] = match;
                     } else if (pattern === patterns[2]) {
+                        // Padrão: "- DESCRIÇÃO 123"
                         [, description, quantity] = match;
                         unit = 'un';
                     } else {
+                        // Padrão: "DESCRIÇÃO 123.45 m"
                         [, description, quantity, unit] = match;
                     }
 
@@ -100,13 +105,21 @@ class SmartComparator {
                     unit = this.normalizeUnit(unit);
 
                     if (description && description.length > 3 && !isNaN(quantity) && quantity > 0) {
-                        materials.push({ description, quantity, unit, source: 'PDF' });
+                        materials.push({ 
+                            description, 
+                            quantity, 
+                            unit, 
+                            source: 'PDF',
+                            linha: index + 1
+                        });
+                        console.log(`✅ Item detectado: "${description}" - ${quantity} ${unit}`);
                         break;
                     }
                 }
             }
         });
 
+        console.log(`📊 Total de itens detectados no PDF: ${materials.length}`);
         return materials;
     }
 
@@ -134,8 +147,10 @@ class SmartComparator {
     parseExcelMaterials(jsonData) {
         const materials = [];
         
+        console.log('Analisando Excel... Total de linhas:', jsonData.length);
+
         // Procura por linhas que contenham descrição e quantidade
-        jsonData.forEach(row => {
+        jsonData.forEach((row, rowIndex) => {
             if (!Array.isArray(row)) return;
 
             for (let i = 0; i < row.length - 1; i++) {
@@ -147,12 +162,15 @@ class SmartComparator {
                         const quantity = this.parseQuantity(nextCell);
                         
                         if (!isNaN(quantity) && quantity > 0) {
-                            materials.push({
+                            const material = {
                                 description: this.cleanDescription(cell),
                                 quantity: quantity,
                                 unit: 'un',
-                                source: 'Excel'
-                            });
+                                source: 'Excel',
+                                linha: rowIndex + 1
+                            };
+                            materials.push(material);
+                            console.log(`✅ Item detectado: "${material.description}" - ${quantity} un`);
                             break;
                         }
                     }
@@ -160,6 +178,7 @@ class SmartComparator {
             }
         });
 
+        console.log(`📊 Total de itens detectados no Excel: ${materials.length}`);
         return materials;
     }
 
@@ -182,7 +201,8 @@ class SmartComparator {
         if (!unit) return 'un';
         const unitMap = {
             'm': 'm', 'un': 'un', 'pç': 'pç', 'mm': 'mm',
-            'metro': 'm', 'unidade': 'un', 'peça': 'pç'
+            'metro': 'm', 'unidade': 'un', 'peça': 'pç',
+            'mm2': 'mm²', 'mm²': 'mm²'
         };
         return unitMap[unit.toLowerCase()] || 'un';
     }
@@ -190,21 +210,27 @@ class SmartComparator {
     checkFilesReady() {
         const btn = document.getElementById('analyzeBtn');
         btn.disabled = !(this.pdfItems.length > 0 && this.excelItems.length > 0);
+        
+        if (!btn.disabled) {
+            console.log('✅ Arquivos prontos para análise!');
+            console.log(`📄 PDF: ${this.pdfItems.length} itens`);
+            console.log(`📊 Excel: ${this.excelItems.length} itens`);
+        }
     }
 
     async analyzeFiles() {
         this.showLoading(true);
 
         try {
-            console.log('Iniciando análise...');
-            console.log('PDF Items:', this.pdfItems);
-            console.log('Excel Items:', this.excelItems);
+            console.log('🔍 Iniciando análise comparativa...');
+            console.log('Itens do PDF:', this.pdfItems);
+            console.log('Itens do Excel:', this.excelItems);
 
             this.results = await this.compareItems(this.pdfItems, this.excelItems);
             this.displayResults();
             
         } catch (error) {
-            console.error('Erro na análise:', error);
+            console.error('❌ Erro na análise:', error);
             alert('Erro na análise: ' + error.message);
         } finally {
             this.showLoading(false);
@@ -215,7 +241,7 @@ class SmartComparator {
         const results = [];
         const matchedExcelIndices = new Set();
 
-        console.log('🔍 Comparando itens...');
+        console.log('🔄 Comparando itens...');
 
         // Para cada item do PDF, busca correspondente no Excel
         pdfItems.forEach(pdfItem => {
@@ -241,9 +267,9 @@ class SmartComparator {
 
                 let observacao = '';
                 if (quantityMatch) {
-                    observacao = 'Quantidades coincidem';
+                    observacao = 'Quantidades coincidem perfeitamente';
                 } else {
-                    observacao = `PDF: ${pdfItem.quantity} vs Excel: ${excelItem.quantity}`;
+                    observacao = `PDF: ${pdfItem.quantity} ${pdfItem.unit} vs Excel: ${excelItem.quantity} ${excelItem.unit}`;
                 }
 
                 results.push({
@@ -255,6 +281,8 @@ class SmartComparator {
                     observacao: observacao,
                     similaridade: bestSimilarity
                 });
+
+                console.log(`📊 ${status}: "${pdfItem.description}" - Similaridade: ${(bestSimilarity * 100).toFixed(0)}%`);
             } else {
                 // Item do PDF não encontrado no Excel
                 results.push({
@@ -266,6 +294,8 @@ class SmartComparator {
                     observacao: 'Item não encontrado no orçamento',
                     similaridade: 0
                 });
+
+                console.log(`⚠️ FALTANDO_NO_ORCAMENTO: "${pdfItem.description}"`);
             }
         });
 
@@ -278,13 +308,15 @@ class SmartComparator {
                     orcamento_quantidade: excelItem.quantity,
                     status: 'FALTANDO_NA_LISTA',
                     diferenca: excelItem.quantity,
-                    observacao: 'Item extra no orçamento',
+                    observacao: 'Item extra no orçamento (não está na lista)',
                     similaridade: 0
                 });
+
+                console.log(`📋 FALTANDO_NA_LISTA: "${excelItem.description}"`);
             }
         });
 
-        console.log('📊 Resultados da análise:', results);
+        console.log('✅ Análise concluída! Total de resultados:', results.length);
         return results;
     }
 
@@ -294,18 +326,20 @@ class SmartComparator {
         const s1 = this.normalizeText(str1);
         const s2 = this.normalizeText(str2);
 
-        // Verificação exata
+        // 1. Verificação exata
         if (s1 === s2) return 1.0;
 
-        // Uma string contém a outra
+        // 2. Uma string contém a outra
         if (s1.includes(s2) || s2.includes(s1)) return 0.9;
 
-        // Similaridade por palavras comuns
-        const words1 = s1.split(/\s+/);
-        const words2 = s2.split(/\s+/);
+        // 3. Similaridade por palavras comuns
+        const words1 = s1.split(/\s+/).filter(w => w.length > 2);
+        const words2 = s2.split(/\s+/).filter(w => w.length > 2);
         
+        if (words1.length === 0 || words2.length === 0) return 0;
+
         const commonWords = words1.filter(word => 
-            word.length > 2 && words2.some(w2 => w2.includes(word) || word.includes(w2))
+            words2.some(w2 => w2.includes(word) || word.includes(w2))
         );
 
         return commonWords.length / Math.max(words1.length, words2.length);
@@ -314,9 +348,9 @@ class SmartComparator {
     normalizeText(text) {
         return text
             .toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^\w\s]/g, ' ')
-            .replace(/\s+/g, ' ')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
+            .replace(/[^\w\s]/g, ' ') // Remove pontuação
+            .replace(/\s+/g, ' ') // Espaços múltiplos para único
             .trim();
     }
 
@@ -420,12 +454,29 @@ class SmartComparator {
         resultsSection.innerHTML = resultsHTML;
         resultsSection.style.display = 'block';
 
-        // Adiciona event listeners
-        this.bindFilterEvents();
-        document.getElementById('exportResultsBtn').addEventListener('click', () => this.exportResults());
-        document.getElementById('showDetailsBtn').addEventListener('click', () => this.showAnalysisDetails());
+        // Agora sim adicionamos os event listeners para os elementos recém-criados
+        this.bindDynamicEvents();
 
         resultsSection.scrollIntoView({ behavior: 'smooth' });
+        
+        console.log('🎉 Resultados exibidos com sucesso!');
+    }
+
+    bindDynamicEvents() {
+        // Adiciona event listeners para elementos criados dinamicamente
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const filter = e.target.dataset.filter;
+                
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                this.filterTable(filter);
+            });
+        });
+
+        document.getElementById('exportResultsBtn').addEventListener('click', () => this.exportResults());
+        document.getElementById('showDetailsBtn').addEventListener('click', () => this.showAnalysisDetails());
     }
 
     calculateSummary() {
@@ -459,19 +510,6 @@ class SmartComparator {
 
     truncateText(text, maxLength) {
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-    }
-
-    bindFilterEvents() {
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const filter = e.target.dataset.filter;
-                
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                
-                this.filterTable(filter);
-            });
-        });
     }
 
     filterTable(filter) {
@@ -520,32 +558,37 @@ class SmartComparator {
         link.href = URL.createObjectURL(dataBlob);
         link.download = `analise_${new Date().getTime()}.json`;
         link.click();
+        
+        console.log('💾 Resultados exportados!');
     }
 
     showAnalysisDetails() {
-        const details = `
-📊 DETALHES DA ANÁLISE:
+        const problemas = this.results.filter(r => r.status !== 'CORRETO');
+        
+        let details = `📊 DETALHES DA ANÁLISE\n\n`;
+        details += `• Itens na lista (PDF): ${this.pdfItems.length}\n`;
+        details += `• Itens no orçamento (Excel): ${this.excelItems.length}\n`;
+        details += `• Total de comparações: ${this.results.length}\n`;
+        details += `• Itens corretos: ${this.results.filter(r => r.status === 'CORRETO').length}\n`;
+        details += `• Problemas encontrados: ${problemas.length}\n\n`;
+        
+        if (problemas.length > 0) {
+            details += `🔍 ITENS QUE PRECISAM DE ATENÇÃO:\n\n`;
+            
+            problemas.forEach((item, index) => {
+                details += `${index + 1}. ${this.getStatusIcon(item.status)} ${item.item}\n`;
+                details += `   📏 Lista: ${item.lista_quantidade} | Orçamento: ${item.orcamento_quantidade}\n`;
+                details += `   📊 Diferença: ${item.diferenca > 0 ? '+' : ''}${item.diferenca}\n`;
+                details += `   💬 ${item.observacao}\n\n`;
+            });
 
-• Itens processados do PDF: ${this.pdfItems.length}
-• Itens processados do Excel: ${this.excelItems.length}
-• Total de comparações: ${this.results.length}
-
-🔍 ITENS QUE PRECISAM DE ATENÇÃO:
-
-${this.results.filter(r => r.status !== 'CORRETO').map(item => `
-${this.getStatusIcon(item.status)} ${item.item}
-   - Status: ${item.status}
-   - Lista: ${item.lista_quantidade} | Orçamento: ${item.orcamento_quantidade}
-   - Diferença: ${item.diferenca > 0 ? '+' : ''}${item.diferenca}
-   - Observação: ${item.observacao}
-`).join('\n')}
-
-💡 AÇÕES RECOMENDADAS:
-
-1. Para itens ❌ DIVERGENTES: Ajuste as quantidades no orçamento
-2. Para itens ⚠️ FALTANDO_NO_ORCAMENTO: Adicione os itens faltantes
-3. Para itens 📋 FALTANDO_NA_LISTA: Verifique se são itens extras necessários
-        `;
+            details += `💡 AÇÕES RECOMENDADAS:\n\n`;
+            details += `1. ❌ DIVERGENTES: Ajuste as quantidades no orçamento\n`;
+            details += `2. ⚠️ FALTANDO_NO_ORCAMENTO: Adicione os itens faltantes\n`;
+            details += `3. 📋 FALTANDO_NA_LISTA: Verifique se são itens extras necessários\n`;
+        } else {
+            details += `🎉 TODOS OS ITENS ESTÃO CORRETOS! Parabéns!`;
+        }
 
         alert(details);
     }
@@ -559,4 +602,5 @@ ${this.getStatusIcon(item.status)} ${item.item}
 // Inicializa a aplicação
 document.addEventListener('DOMContentLoaded', () => {
     new SmartComparator();
+    console.log('🚀 Comparador Inteligente inicializado!');
 });
