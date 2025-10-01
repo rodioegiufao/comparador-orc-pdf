@@ -1,8 +1,11 @@
 // script.js - Versão Simplificada
+// script.js - Versão Inteligente para Formatações Diferentes
 class SmartComparator {
     constructor() {
         this.pdfFile = null;
         this.excelFile = null;
+        this.pdfText = '';
+        this.excelText = '';
     }
 
     init() {
@@ -12,75 +15,205 @@ class SmartComparator {
     bindEvents() {
         document.getElementById('pdfFile').addEventListener('change', (e) => this.handleFileUpload(e, 'pdf'));
         document.getElementById('excelFile').addEventListener('change', (e) => this.handleFileUpload(e, 'excel'));
-        document.getElementById('analyzeBtn').addEventListener('click', () => this.generatePrompt());
+        document.getElementById('analyzeBtn').addEventListener('click', () => this.prepareForChatGPT());
     }
 
-    handleFileUpload(event, type) {
+    async handleFileUpload(event, type) {
         const file = event.target.files[0];
-        if (!file) return;
-
-        if (type === 'pdf') {
-            this.pdfFile = file;
-        } else {
-            this.excelFile = file;
+        if (!file) {
+            console.log('Nenhum arquivo selecionado para', type);
+            return;
         }
 
-        this.updateFilePreview(type, file);
-        this.checkFilesReady();
+        console.log('Arquivo selecionado:', file.name, 'Tipo:', type);
+        
+        const previewElement = document.getElementById(type + 'Preview');
+        previewElement.innerHTML = '<p><strong>' + file.name + '</strong> - Carregando...</p>';
+
+        try {
+            if (type === 'pdf') {
+                this.pdfFile = file;
+                this.pdfText = await this.extractPDFText(file);
+                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - PDF carregado</small>';
+                console.log('PDF carregado com sucesso');
+            } else {
+                this.excelFile = file;
+                this.excelText = await this.extractExcelText(file);
+                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - Excel carregado</small>';
+                console.log('Excel carregado com sucesso');
+            }
+        } catch (error) {
+            console.error('Erro ao processar ' + type + ':', error);
+            previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ❌ Erro: ' + error.message + '</p>';
+        } finally {
+            this.checkFilesReady();
+        }
     }
 
-    updateFilePreview(type, file) {
-        const previewElement = document.getElementById(type + 'Preview');
-        previewElement.innerHTML = `
-            <p><strong>${file.name}</strong> ✅</p>
-            <small>${(file.size / 1024).toFixed(1)} KB</small>
-        `;
+    async extractPDFText(file) {
+        console.log('Extraindo texto do PDF...');
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let fullText = '';
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+            }
+
+            console.log('PDF extraído:', fullText.length, 'caracteres');
+            return fullText;
+        } catch (error) {
+            console.error('Erro na extração PDF:', error);
+            throw error;
+        }
+    }
+
+    async extractExcelText(file) {
+        console.log('Extraindo texto do Excel...');
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    let excelText = '';
+                    
+                    workbook.SheetNames.forEach(sheetName => {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+                        
+                        excelText += `=== PLANILHA: ${sheetName} ===\n`;
+                        jsonData.forEach((row, index) => {
+                            if (row && row.length > 0) {
+                                // Foca nas colunas D, E, F (índices 3, 4, 5)
+                                const descricao = row[3] || ''; // Coluna D
+                                const unidade = row[4] || '';   // Coluna E
+                                const quantidade = row[5] || ''; // Coluna F
+                                
+                                if (descricao || unidade || quantidade) {
+                                    excelText += `LINHA ${index + 1}: "${descricao}" | ${unidade} | ${quantidade}\n`;
+                                }
+                            }
+                        });
+                        excelText += '\n';
+                    });
+                    
+                    console.log('Excel extraído:', excelText.length, 'caracteres');
+                    resolve(excelText);
+                } catch (error) {
+                    console.error('Erro na extração Excel:', error);
+                    reject(error);
+                }
+            };
+            
+            reader.onerror = function(error) {
+                console.error('Erro no FileReader:', error);
+                reject(error);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
     }
 
     checkFilesReady() {
         const btn = document.getElementById('analyzeBtn');
-        btn.disabled = !(this.pdfFile && this.excelFile);
+        const isReady = this.pdfFile && this.excelFile;
+        
+        btn.disabled = !isReady;
     }
 
-    generatePrompt() {
+    prepareForChatGPT() {
+        console.log('Preparando prompt para ChatGPT...');
+        
+        if (!this.pdfFile || !this.excelFile) {
+            alert('❌ Por favor, carregue ambos os arquivos primeiro.');
+            return;
+        }
+
         const prompt = this.createChatGPTPrompt();
         this.displayPrompt(prompt);
     }
 
     createChatGPTPrompt() {
-        return `ANÁLISE: LISTA DE MATERIAIS vs ORÇAMENTO
+        return `ANÁLISE ESPECIALIZADA: LISTA DE MATERIAIS vs ORÇAMENTO
 
-ANEXEI DOIS ARQUIVOS:
-1. "lista_materiais.pdf" - Lista de Materiais em PDF
-2. "orcamento.xlsx" - Orçamento em Excel
+IMPORTANTE - FORMATOS DIFERENTES:
 
-SUA TAREFA: Comparar os dois arquivos e identificar TODAS as divergências nos quantitativos.
+📄 PDF (LISTA DE MATERIAIS):
+- Todo o texto está em BLOCO CONTÍNUO, sem quebras organizadas
+- Você precisa IDENTIFICAR os materiais e quantidades no meio do texto corrido
+- Procure por padrões como: "quantidade", "un", "m", "kg", números seguidos de unidades
 
-**INFORMAÇÕES IMPORTANTES PARA AGILIZAR:**
-- No Excel, as DESCRIÇÕES estão na COLUNA D
-- As UNIDADES estão na COLUNA E  
-- Os QUANTITATIVOS estão na COLUNA F
+📊 EXCEL (ORÇAMENTO):
+- Estruturado em COLUNAS:
+  * Coluna D: DESCRIÇÃO do material
+  * Coluna E: UNIDADE (un, m, kg, etc)
+  * Coluna F: QUANTIDADE numérica
 
-**O QUE PROCURAR:**
-✅ Itens com quantidades DIFERENTES entre PDF e Excel
-❌ Itens que estão no PDF mas NÃO estão no Excel (faltantes)
-📋 Itens que estão no Excel mas NÃO estão no PDF (extras)
+SEU OBJETIVO: Encontrar TODAS as divergências entre os dois documentos.
 
-**FORMATO DA RESPOSTA (OBRIGATÓRIO):**
+DADOS PARA ANÁLISE:
 
-ITEM: [Nome completo do material]
+=== PDF - LISTA DE MATERIAIS (TEXTO CORRIDO) ===
+${this.pdfText}
+
+=== EXCEL - ORÇAMENTO (ESTRUTURADO) ===  
+${this.excelText}
+
+INSTRUÇÕES DETALHADAS:
+
+1. NO PDF: Extraia cada material e sua quantidade do texto corrido
+2. NO EXCEL: Use as colunas D (descrição), E (unidade), F (quantidade)
+3. COMPARE: Encontre correspondências pelos nomes dos materiais
+4. IDENTIFIQUE:
+   - 🔴 Quantidades DIFERENTES para o mesmo material
+   - 🟡 Materiais no PDF mas NÃO no Excel (FALTANDO)
+   - 🔵 Materiais no Excel mas NÃO no PDF (EXTRAS)
+
+FORMATO DE RESPOSTA (OBRIGATÓRIO):
+
+Para CADA divergência encontrada:
+
+ITEM: [Nome do material]
 LISTA (PDF): [quantidade] [unidade]
-ORÇAMENTO (Excel): [quantidade] [unidade] 
-DIFERENÇA: [+/- diferença numérica]
+ORÇAMENTO (Excel): [quantidade] [unidade]
+DIFERENÇA: [+/- valor da diferença]
 STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
 
-[Repita para cada divergência encontrada]
+EXEMPLOS:
 
-**INSTRUÇÕES:**
-- Seja COMPLETO e detalhado
-- Inclua TODOS os itens com divergência
+ITEM: CABO ELÉTRICO 2,5mm
+LISTA (PDF): 150 m
+ORÇAMENTO (Excel): 120 m
+DIFERENÇA: -30
+STATUS: QUANTIDADE DIFERENTE
+
+ITEM: LUMINÁRIA LED
+LISTA (PDF): 25 un
+ORÇAMENTO (Excel): NÃO ENCONTRADO
+DIFERENÇA: -25
+STATUS: FALTANDO NO ORÇAMENTO
+
+ITEM: PARAFUSO SExtra
+LISTA (PDF): NÃO ENCONTRADO
+ORÇAMENTO (Excel): 100 un
+DIFERENÇA: +100
+STATUS: EXTRA NO ORÇAMENTO
+
+REGRAS:
+- Seja METICULOSO na busca por correspondências
 - Calcule as diferenças numéricas
-- Mantenha este formato exato`;
+- Inclua TODOS os itens com divergência
+- Mantenha este formato exato
+- Ignore itens que estão iguais nos dois documentos
+
+COMEÇE A ANÁLISE:`;
     }
 
     displayPrompt(prompt) {
@@ -97,35 +230,29 @@ STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
                 >${prompt}</textarea>
                 
                 <button onclick="copyToClipboard()" class="copy-btn">
-                    📋 Copiar Prompt
+                    📋 Copiar Prompt para ChatGPT
                 </button>
                 
                 <div class="instructions">
-                    <h4>📋 COMO USAR:</h4>
-                    <ol>
-                        <li><strong>Clique em "Copiar Prompt"</strong> acima</li>
-                        <li><strong>Abra o ChatGPT-4</strong> em outra aba</li>
-                        <li><strong>Cole o prompt</strong> e envie</li>
-                        <li><strong>FAÇA O UPLOAD DOS ARQUIVOS</strong> como anexo no ChatGPT</li>
-                        <li><strong>Aguarde a análise completa</strong></li>
-                        <li><strong>Cole a resposta abaixo</strong> quando receber</li>
-                    </ol>
-                    
-                    <p style="color: #d35400; margin-top: 10px;">
-                        <strong>⚠️ IMPORTANTE:</strong> Você precisará fazer UPLOAD MANUAL dos arquivos no ChatGPT!
-                    </p>
+                    <h4>🎯 DICAS PARA ANÁLISE PRECISA:</h4>
+                    <ul>
+                        <li><strong>PDF:</strong> Texto corrido - o ChatGPT precisa caçar os materiais no meio do texto</li>
+                        <li><strong>Excel:</strong> Estruturado - colunas D, E, F são as importantes</li>
+                        <li><strong>Foque</strong> em encontrar NOMES SIMILARES de materiais</li>
+                        <li><strong>Ignore</strong> pequenas diferenças de escrita nos nomes</li>
+                    </ul>
                 </div>
             </div>
         `;
 
         resultsSection.style.display = 'block';
         this.showResponseSection();
-        
+
         window.copyToClipboard = () => {
             const textarea = document.getElementById('chatgptPrompt');
             textarea.select();
             document.execCommand('copy');
-            alert('✅ Prompt copiado! Agora cole no ChatGPT-4 e faça o upload dos arquivos.');
+            alert('✅ Prompt copiado! Cole no ChatGPT-4 para análise.');
         };
     }
 
@@ -136,6 +263,8 @@ STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
     }
 }
 
+// [MANTENHA AS FUNÇÕES processChatGPTResponse, displayProcessedResults, etc QUE JÁ TINHAMOS]
+// ... (as funções de processamento de resposta permanecem iguais)
 // Funções para processar a resposta do ChatGPT
 function processChatGPTResponse() {
     const responseText = document.getElementById('chatgptResponse').value.trim();
