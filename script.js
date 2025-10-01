@@ -30,18 +30,61 @@ class SmartComparator {
                 alert('Por favor, cole a resposta do ChatGPT primeiro.');
                 return;
             }
-
+        
             try {
-                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                    const resultData = JSON.parse(jsonMatch[0]);
-                    this.displayResults(resultData);
-                } else {
-                    throw new Error('JSON não encontrado na resposta. Certifique-se de copiar TODA a resposta do ChatGPT.');
+                // Tenta encontrar JSON na resposta - método mais robusto
+                let jsonString = responseText.trim();
+                
+                // Remove possíveis markdown code blocks
+                jsonString = jsonString.replace(/```json\s*/g, '');
+                jsonString = jsonString.replace(/```\s*/g, '');
+                
+                // Encontra o primeiro { e o último }
+                const firstBrace = jsonString.indexOf('{');
+                const lastBrace = jsonString.lastIndexOf('}');
+                
+                if (firstBrace !== -1 && lastBrace !== -1) {
+                    jsonString = jsonString.substring(firstBrace, lastBrace + 1);
                 }
+                
+                // Remove espaços em branco extras
+                jsonString = jsonString.trim();
+                
+                console.log('Tentando parse do JSON:', jsonString.substring(0, 200) + '...');
+                
+                const resultData = JSON.parse(jsonString);
+                this.displayResults(resultData);
+                
             } catch (error) {
                 console.error('Erro ao processar resposta:', error);
-                alert('❌ Erro ao processar a resposta:\n\n' + error.message + '\n\nVerifique se copiou toda a resposta JSON do ChatGPT.');
+                console.log('Resposta completa:', responseText);
+                
+                // Tenta análise mais agressiva
+                try {
+                    // Procura por padrão JSON mais flexível
+                    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const cleanedJson = jsonMatch[0]
+                            .replace(/[\u2018\u2019]/g, "'")
+                            .replace(/[\u201C\u201D]/g, '"')
+                            .replace(/[“”]/g, '"');
+                        
+                        console.log('Tentando parse limpo:', cleanedJson.substring(0, 200) + '...');
+                        const resultData = JSON.parse(cleanedJson);
+                        this.displayResults(resultData);
+                        return;
+                    }
+                } catch (secondError) {
+                    console.error('Segunda tentativa falhou:', secondError);
+                }
+                
+                alert('❌ Não consegui processar a resposta do ChatGPT.\n\n' +
+                      'Certifique-se de que:\n' +
+                      '1. Você copiou APENAS a resposta JSON do ChatGPT\n' + 
+                      '2. Não incluiu o prompt ou outros textos\n' +
+                      '3. O JSON está completo e válido\n\n' +
+                      'Erro: ' + error.message +
+                      '\n\nUse o botão "🤖 Análise Automática" como alternativa.');
             }
         };
 
@@ -547,7 +590,7 @@ EXIGÊNCIAS:
 
 NÃO ACEITAREI resposta com poucos itens. Analise COMPLETAMENTE.
 
-RETORNE APENAS JSON:`;
+RIMPORTANTE FINAL: Sua resposta deve ser APENAS o JSON válido, sem nenhum texto adicional antes ou depois. Não inclua explicações, não use markdown, apenas o JSON puro.`;
     }
 
     displayChatGPTPrompt(prompt) {
