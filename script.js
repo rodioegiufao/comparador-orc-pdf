@@ -162,6 +162,29 @@ class SmartComparator {
                 ]
             };
         }
+            
+            const totalPDF = corretos + divergentes + faltandoOrcamento;
+            const totalExcel = corretos + divergentes + faltandoLista;
+            const taxaAcerto = totalPDF > 0 ? ((corretos / totalPDF) * 100).toFixed(1) + '%' : '0%';
+            
+            return {
+                resumo: {
+                    total_itens_pdf: totalPDF,
+                    total_itens_excel: totalExcel,
+                    itens_corretos: corretos,
+                    itens_divergentes: divergentes,
+                    itens_faltando_orcamento: faltandoOrcamento,
+                    itens_faltando_lista: faltandoLista,
+                    taxa_acerto: taxaAcerto
+                },
+                comparacao: comparison,
+                recomendacoes: [
+                    `Ajustar ${divergentes} itens divergentes`,
+                    `Incluir ${faltandoOrcamento} itens faltantes no orçamento`,
+                    `Verificar ${faltandoLista} itens extras no Excel`
+                ]
+            };
+        }
 
         window.runAutomaticAnalysis = () => {
             if (!window.smartComparator) {
