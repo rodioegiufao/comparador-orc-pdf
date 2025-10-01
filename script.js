@@ -157,12 +157,12 @@ class SmartComparator {
     
     ARQUIVO 1 - LISTA DE MATERIAIS (PDF):
     """
-    ${this.pdfText.substring(0, 10000)}  // Limita para não ficar muito grande
+    ${this.pdfText}
     """
     
     ARQUIVO 2 - ORÇAMENTO (EXCEL):
     """
-    ${this.excelText.substring(0, 8000)}  // Limita para não ficar muito grande
+    ${this.excelText}
     """
     
     **RESPONDA APENAS COM ESTE FORMATO SIMPLES:**
@@ -172,19 +172,8 @@ class SmartComparator {
     
     SE HOUVER DIVERGÊNCIAS:
     ❌ ENCONTRADAS DIVERGÊNCIAS:
-    
-    [ITEM 1]: [Descrição breve]
-    - PDF: [quantidade] [unidade]
-    - Excel: [quantidade] [unidade] 
-    - Problema: [QUANTIDADE DIFERENTE / FALTANDO NO EXCEL / EXTRA NO EXCEL]
-    
-    [ITEM 2]: [Descrição breve]
-    - PDF: [quantidade] [unidade]
-    - Excel: [quantidade] [unidade]
-    - Problema: [QUANTIDADE DIFERENTE / FALTANDO NO EXCEL / EXTRA NO EXCEL]
-    
-    **FOCO NAS PRINCIPAIS DIVERGÊNCIAS - MÁXIMO 15 ITENS MAIS CRÍTICOS**
-    
+
+    A LISTA DO PDF INFELIZMENTE SAI TUDO JUNTO, SEPARE OS MESMOS
     NÃO PRECISA ANALISAR TUDO, APENAS OS ITENS MAIS IMPORTANTES QUE ESTÃO DIFERENTES.`;
     }
 
