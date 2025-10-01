@@ -1,4 +1,4 @@
-// script.js - Versão Corrigida
+// script.js - Versão COMPLETA com seção de resposta
 class SmartComparator {
     constructor() {
         this.pdfFile = null;
@@ -246,6 +246,9 @@ COMEÇE AGORA:`;
         resultsSection.style.display = 'block';
         resultsSection.scrollIntoView({ behavior: 'smooth' });
 
+        // ✅ MOSTRAR A SEÇÃO DE RESPOSTA
+        this.showResponseSection();
+
         // Define a função de copiar
         window.copyToClipboard = () => {
             const textarea = document.getElementById('chatgptPrompt');
@@ -254,22 +257,20 @@ COMEÇE AGORA:`;
             alert('✅ Prompt copiado! Agora cole no ChatGPT-4.');
         };
     }
+
+    showResponseSection() {
+        const responseSection = document.getElementById('responseSection');
+        if (responseSection) {
+            responseSection.style.display = 'block';
+            responseSection.scrollIntoView({ behavior: 'smooth' });
+            console.log('✅ Seção de resposta mostrada');
+        } else {
+            console.error('❌ Elemento responseSection não encontrado');
+        }
+    }
 }
 
-// Inicialização
-document.addEventListener('DOMContentLoaded', function() {
-    window.smartComparator = new SmartComparator();
-    window.smartComparator.init();
-    console.log('✅ Sistema inicializado!');
-});
-// Adicione estas funções no final do seu script.js
-
-function showResponseSection() {
-    const responseSection = document.getElementById('responseSection');
-    responseSection.style.display = 'block';
-    responseSection.scrollIntoView({ behavior: 'smooth' });
-}
-
+// === FUNÇÕES GLOBAIS PARA PROCESSAR RESPOSTA ===
 function processChatGPTResponse() {
     const responseText = document.getElementById('chatgptResponse').value.trim();
     
@@ -280,7 +281,6 @@ function processChatGPTResponse() {
     
     console.log('Processando resposta do ChatGPT...');
     
-    // Mostrar loading
     const resultsDisplay = document.getElementById('resultsDisplay');
     resultsDisplay.innerHTML = `
         <div class="loading">
@@ -290,17 +290,18 @@ function processChatGPTResponse() {
     `;
     resultsDisplay.style.display = 'block';
     
-    // Simular processamento (você pode implementar a lógica real aqui)
     setTimeout(() => {
         displayProcessedResults(responseText);
-    }, 1000);
+    }, 1500);
 }
 
 function displayProcessedResults(responseText) {
     const resultsDisplay = document.getElementById('resultsDisplay');
     
-    // Aqui você pode implementar a lógica para parsear e formatar a resposta
-    // Por enquanto, vou mostrar a resposta crua formatada
+    const totalItems = (responseText.match(/ITEM:/g) || []).length;
+    const divergencias = (responseText.match(/STATUS:.*QUANTIDADE DIFERENTE/g) || []).length;
+    const faltantes = (responseText.match(/STATUS:.*FALTANDO/g) || []).length;
+    const extras = (responseText.match(/STATUS:.*EXTRA/g) || []).length;
     
     resultsDisplay.innerHTML = `
         <div class="results-section">
@@ -309,39 +310,26 @@ function displayProcessedResults(responseText) {
             <div class="summary-cards">
                 <div class="card total">
                     <h3>TOTAL ITENS</h3>
-                    <div class="number">${countItems(responseText)}</div>
-                </div>
-                <div class="card match">
-                    <h3>CONFERIDOS</h3>
-                    <div class="number">${countMatches(responseText)}</div>
+                    <div class="number">${totalItems}</div>
                 </div>
                 <div class="card mismatch">
                     <h3>DIVERGÊNCIAS</h3>
-                    <div class="number">${countMismatches(responseText)}</div>
+                    <div class="number">${divergencias}</div>
                 </div>
                 <div class="card missing">
                     <h3>FALTANTES</h3>
-                    <div class="number">${countMissing(responseText)}</div>
+                    <div class="number">${faltantes}</div>
+                </div>
+                <div class="card match">
+                    <h3>EXTRAS</h3>
+                    <div class="number">${extras}</div>
                 </div>
             </div>
             
             <div class="analysis-info">
                 <h3>📋 DETALHES DA ANÁLISE</h3>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Lista (PDF)</th>
-                                <th>Orçamento (Excel)</th>
-                                <th>Diferença</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${parseResponseToTable(responseText)}
-                        </tbody>
-                    </table>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                    <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px; max-height: 500px; overflow-y: auto;">${responseText}</pre>
                 </div>
             </div>
             
@@ -359,72 +347,6 @@ function displayProcessedResults(responseText) {
     resultsDisplay.scrollIntoView({ behavior: 'smooth' });
 }
 
-// Funções auxiliares para processar a resposta
-function countItems(text) {
-    const items = text.match(/ITEM:/g);
-    return items ? items.length : 0;
-}
-
-function countMatches(text) {
-    const matches = text.match(/STATUS:.*QUANTIDADE DIFERENTE/g);
-    return matches ? matches.length : 0;
-}
-
-function countMismatches(text) {
-    const mismatches = text.match(/STATUS:.*FALTANDO/g);
-    return mismatches ? mismatches.length : 0;
-}
-
-function countMissing(text) {
-    const missing = text.match(/STATUS:.*EXTRA/g);
-    return missing ? missing.length : 0;
-}
-
-function parseResponseToTable(text) {
-    // Esta é uma implementação básica - você pode melhorar conforme o formato exato
-    const lines = text.split('\n');
-    let tableRows = '';
-    let currentItem = {};
-    
-    lines.forEach(line => {
-        if (line.includes('ITEM:')) {
-            currentItem.item = line.replace('ITEM:', '').trim();
-        } else if (line.includes('LISTA (PDF):')) {
-            currentItem.lista = line.replace('LISTA (PDF):', '').trim();
-        } else if (line.includes('ORÇAMENTO (Excel):')) {
-            currentItem.orçamento = line.replace('ORÇAMENTO (Excel):', '').trim();
-        } else if (line.includes('DIFERENÇA:')) {
-            currentItem.diferenca = line.replace('DIFERENÇA:', '').trim();
-        } else if (line.includes('STATUS:')) {
-            currentItem.status = line.replace('STATUS:', '').trim();
-            
-            // Quando completamos um item, adicionamos à tabela
-            if (currentItem.item) {
-                tableRows += `
-                    <tr>
-                        <td>${currentItem.item || ''}</td>
-                        <td>${currentItem.lista || ''}</td>
-                        <td>${currentItem.orçamento || ''}</td>
-                        <td class="difference-${currentItem.diferenca?.includes('+') ? 'positive' : 'negative'}">${currentItem.diferenca || ''}</td>
-                        <td class="status-${getStatusClass(currentItem.status)}">${currentItem.status || ''}</td>
-                    </tr>
-                `;
-                currentItem = {}; // Reset para o próximo item
-            }
-        }
-    });
-    
-    return tableRows || '<tr><td colspan="5">Nenhum item processado. Verifique o formato da resposta.</td></tr>';
-}
-
-function getStatusClass(status) {
-    if (!status) return '';
-    if (status.includes('QUANTIDADE DIFERENTE')) return 'mismatch';
-    if (status.includes('FALTANDO')) return 'missing';
-    if (status.includes('EXTRA')) return 'extra';
-    return '';
-}
-
 function clearResponse() {
     document.getElementById('chatgptResponse').value = '';
 }
@@ -436,3 +358,10 @@ function exportToExcel() {
 function generateReport() {
     alert('📄 Funcionalidade de relatório será implementada!');
 }
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    window.smartComparator = new SmartComparator();
+    window.smartComparator.init();
+    console.log('✅ Sistema inicializado!');
+});
