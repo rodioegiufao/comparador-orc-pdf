@@ -32,13 +32,15 @@ class ChatGPTComparator {
             if (type === 'pdf') {
                 this.pdfText = await this.extractPDFText(file);
                 previewElement.innerHTML = `<p><strong>${file.name}</strong> ✅</p>`;
+                console.log('Texto extraído do PDF (primeiros 500 caracteres):', this.pdfText.substring(0, 500));
             } else {
                 this.excelData = await this.extractExcelData(file);
                 previewElement.innerHTML = `<p><strong>${file.name}</strong> ✅</p>`;
+                console.log('Dados extraídos do Excel:', this.excelData.slice(0, 5));
             }
         } catch (error) {
             console.error(`Erro ao processar ${type}:`, error);
-            previewElement.innerHTML = `<p><strong>${file.name}</strong> ❌ Erro</p>`;
+            previewElement.innerHTML = `<p><strong>${file.name}</strong> ❌ Erro: ${error.message}</p>`;
         } finally {
             this.showLoading(false);
             this.checkFilesReady();
@@ -46,18 +48,27 @@ class ChatGPTComparator {
     }
 
     async extractPDFText(file) {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-        let fullText = '';
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let fullText = '';
 
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(' ');
-            fullText += pageText + '\n';
+            console.log(`PDF tem ${pdf.numPages} páginas`);
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+                
+                console.log(`Página ${i} extraída: ${pageText.length} caracteres`);
+            }
+
+            return fullText;
+        } catch (error) {
+            console.error('Erro ao extrair texto do PDF:', error);
+            throw new Error('Não foi possível ler o PDF. Verifique se o arquivo não está corrompido.');
         }
-
-        return fullText;
     }
 
     async extractExcelData(file) {
@@ -76,7 +87,7 @@ class ChatGPTComparator {
                 }
             };
             
-            reader.onerror = reject;
+            reader.onerror = () => reject(new Error('Erro ao ler arquivo Excel'));
             reader.readAsArrayBuffer(file);
         });
     }
@@ -84,6 +95,12 @@ class ChatGPTComparator {
     checkFilesReady() {
         const btn = document.getElementById('analyzeBtn');
         btn.disabled = !(this.pdfText && this.excelData.length > 0);
+        
+        if (!btn.disabled) {
+            console.log('Arquivos prontos para análise');
+            console.log('PDF texto length:', this.pdfText.length);
+            console.log('Excel rows:', this.excelData.length);
+        }
     }
 
     prepareAnalysis() {
@@ -97,31 +114,49 @@ class ChatGPTComparator {
         
         // Scroll para a seção de prompt
         document.getElementById('promptSection').scrollIntoView({ behavior: 'smooth' });
+        
+        console.log('Prompt gerado com sucesso');
     }
 
     createAnalysisPrompt() {
-        const excelSample = this.excelData.slice(0, 10).map(row => row.join(' | ')).join('\n');
-        const pdfSample = this.pdfText.substring(0, 1500) + (this.pdfText.length > 1500 ? '...' : '');
+        // Pega amostra do Excel (primeiras 15 linhas)
+        const excelSample = this.excelData
+            .slice(0, 15)
+            .map(row => Array.isArray(row) ? row.join(' | ') : String(row))
+            .join('\n');
+            
+        // Pega amostra do PDF (primeiros 2000 caracteres)
+        const pdfSample = this.pdfText.substring(0, 2000) + (this.pdfText.length > 2000 ? '...' : '');
 
         return `ANÁLISE DE COMPARAÇÃO ENTRE LISTA DE MATERIAIS E ORÇAMENTO
+
+OBJETIVO: Comparar a lista de materiais (PDF) com o orçamento (Excel) e identificar discrepâncias.
 
 POR FAVOR, ANALISE OS DADOS ABAIXO E IDENTIFIQUE:
 
 1. Itens que estão em AMBOS os arquivos com quantidades CORRETAS
-2. Itens que estão em AMBOS mas com quantidades DIFERENTES
-3. Itens que estão apenas na LISTA DE MATERIAIS (PDF)
-4. Itens que estão apenas no ORÇAMENTO (Excel)
+2. Itens que estão em AMBOS mas com quantidades DIFERENTES  
+3. Itens que estão apenas na LISTA DE MATERIAIS (PDF) - FALTANDO_NO_ORCAMENTO
+4. Itens que estão apenas no ORÇAMENTO (Excel) - FALTANDO_NA_LISTA
 
 RETORNE APENAS UM JSON NO SEGUINTE FORMATO:
 {
   "comparison": [
     {
-      "item": "Nome do item",
+      "item": "Nome completo do item",
       "lista_quantidade": 100,
       "orcamento_quantidade": 100,
-      "status": "CORRETO" | "DIVERGENTE" | "FALTANDO_NO_ORCAMENTO" | "FALTANDO_NA_LISTA",
+      "status": "CORRETO",
       "diferenca": 0,
-      "observacao": "Descrição detalhada"
+      "observacao": "Quantidades coincidem"
+    },
+    {
+      "item": "Outro item",
+      "lista_quantidade": 50,
+      "orcamento_quantidade": 45, 
+      "status": "DIVERGENTE",
+      "diferenca": -5,
+      "observacao": "Diferença de 5 unidades"
     }
   ],
   "resumo": {
@@ -138,18 +173,19 @@ DADOS DA LISTA DE MATERIAIS (PDF):
 ${pdfSample}
 \`\`\`
 
-DADOS DO ORÇAMENTO (Excel - primeiras linhas):
+DADOS DO ORÇAMENTO (Excel):
 \`\`\`
 ${excelSample}
 \`\`\`
 
 INSTRUÇÕES IMPORTANTES:
-- Compare os itens por similaridade de descrição
-- Considere variações de nomenclatura (ex: "CABO 3X1,5MM" = "CABO ISOLADO 3X1,5MM²")
-- Ignore cabeçalhos e textos explicativos
+- Compare os itens por similaridade de descrição (ex: "CABO 3X1,5MM" = "CABO ISOLADO 3X1,5MM²")
+- Considere sinônimos e abreviações comuns na área elétrica
+- Ignore cabeçalhos, totais e textos explicativos
 - Foque apenas em itens com quantidades numéricas
+- Para itens faltantes, coloque 0 na quantidade do arquivo onde falta
 
-RETORNE APENAS O JSON, SEM EXPLICAÇÕES ADICIONAIS.`;
+RETORNE APENAS O JSON VÁLIDO, SEM TEXTOS EXPLICATIVOS ADICIONAIS.`;
     }
 
     copyPrompt() {
@@ -177,18 +213,23 @@ RETORNE APENAS O JSON, SEM EXPLICAÇÕES ADICIONAIS.`;
         this.showLoading(true);
 
         try {
+            console.log('Processando resposta do ChatGPT...');
+            console.log('Resposta recebida:', responseText.substring(0, 500) + '...');
+
             // Tenta extrair JSON da resposta
             const jsonMatch = responseText.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
-                throw new Error('Não foi possível encontrar JSON na resposta');
+                throw new Error('Não foi possível encontrar JSON na resposta. Certifique-se de que o ChatGPT retornou um JSON válido.');
             }
 
             const analysisResult = JSON.parse(jsonMatch[0]);
+            console.log('JSON parseado com sucesso:', analysisResult);
+            
             this.displayResults(analysisResult);
             
         } catch (error) {
             console.error('Erro ao processar resposta:', error);
-            alert('Erro ao processar resposta do ChatGPT. Verifique se a resposta contém um JSON válido.');
+            alert('Erro ao processar resposta do ChatGPT:\n\n' + error.message + '\n\nVerifique o console (F12) para mais detalhes.');
         } finally {
             this.showLoading(false);
         }
@@ -197,6 +238,11 @@ RETORNE APENAS O JSON, SEM EXPLICAÇÕES ADICIONAIS.`;
     displayResults(analysisResult) {
         const resultsSection = document.getElementById('resultsSection');
         
+        // Verifica se a estrutura do JSON está correta
+        if (!analysisResult.comparison || !analysisResult.resumo) {
+            throw new Error('Estrutura do JSON inválida. Certifique-se de que o ChatGPT retornou o formato correto.');
+        }
+
         // Cria o HTML dos resultados
         let resultsHTML = `
             <div class="summary-cards">
@@ -244,7 +290,7 @@ RETORNE APENAS O JSON, SEM EXPLICAÇÕES ADICIONAIS.`;
         analysisResult.comparison.forEach(item => {
             const statusClass = this.getStatusClass(item.status);
             const statusIcon = this.getStatusIcon(item.status);
-            const differenceClass = item.diferenca > 0 ? 'difference-positive' : 'difference-negative';
+            const differenceClass = item.diferenca > 0 ? 'difference-positive' : item.diferenca < 0 ? 'difference-negative' : '';
             
             resultsHTML += `
                 <tr>
@@ -277,6 +323,8 @@ RETORNE APENAS O JSON, SEM EXPLICAÇÕES ADICIONAIS.`;
 
         // Scroll para resultados
         resultsSection.scrollIntoView({ behavior: 'smooth' });
+        
+        console.log('Resultados exibidos com sucesso');
     }
 
     getStatusClass(status) {
@@ -284,7 +332,7 @@ RETORNE APENAS O JSON, SEM EXPLICAÇÕES ADICIONAIS.`;
             'CORRETO': 'status-match',
             'DIVERGENTE': 'status-mismatch',
             'FALTANDO_NO_ORCAMENTO': 'status-missing',
-            'FALTANDO_NA_LISTA': 'status-missing'
+            'FALTANDO_NA_LISTA': 'status-extra'
         };
         return classes[status] || 'status-unknown';
     }
@@ -360,6 +408,8 @@ RETORNE APENAS O JSON, SEM EXPLICAÇÕES ADICIONAIS.`;
         link.href = URL.createObjectURL(dataBlob);
         link.download = 'analise_comparacao.json';
         link.click();
+        
+        console.log('Resultados exportados');
     }
 
     showLoading(show) {
@@ -367,10 +417,8 @@ RETORNE APENAS O JSON, SEM EXPLICAÇÕES ADICIONAIS.`;
     }
 }
 
-// Configuração do PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
 // Inicializa a aplicação
 document.addEventListener('DOMContentLoaded', () => {
     new ChatGPTComparator();
+    console.log('Comparador Inteligente inicializado!');
 });
