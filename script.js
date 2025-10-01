@@ -1,10 +1,10 @@
-// script.js - Versão Simplificada (Apenas Divergentes)
+// script.js - Versão ChatGPT Direto
 class SmartComparator {
     constructor() {
         this.pdfFile = null;
         this.excelFile = null;
         this.pdfText = '';
-        this.excelData = null;
+        this.excelText = '';
     }
 
     init() {
@@ -14,7 +14,7 @@ class SmartComparator {
     bindEvents() {
         document.getElementById('pdfFile').addEventListener('change', (e) => this.handleFileUpload(e, 'pdf'));
         document.getElementById('excelFile').addEventListener('change', (e) => this.handleFileUpload(e, 'excel'));
-        document.getElementById('analyzeBtn').addEventListener('click', () => this.analyzeFiles());
+        document.getElementById('analyzeBtn').addEventListener('click', () => this.prepareForChatGPT());
     }
 
     async handleFileUpload(event, type) {
@@ -31,7 +31,7 @@ class SmartComparator {
                 previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB</small>';
             } else {
                 this.excelFile = file;
-                this.excelData = await this.extractExcelData(file);
+                this.excelText = await this.extractExcelText(file);
                 previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB</small>';
             }
         } catch (error) {
@@ -51,13 +51,13 @@ class SmartComparator {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             const pageText = textContent.items.map(item => item.str).join(' ');
-            fullText += pageText + '\n';
+            fullText += `--- Página ${i} ---\n${pageText}\n\n`;
         }
 
         return fullText;
     }
 
-    async extractExcelData(file) {
+    async extractExcelText(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             
@@ -66,18 +66,23 @@ class SmartComparator {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    const sheetsData = {};
-                    workbook.SheetNames.forEach(function(sheetName) {
+                    let excelText = `ARQUIVO: ${file.name}\n`;
+                    excelText += `PLANILHAS: ${workbook.SheetNames.join(', ')}\n\n`;
+                    
+                    workbook.SheetNames.forEach(sheetName => {
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-                        sheetsData[sheetName] = jsonData;
+                        
+                        excelText += `=== PLANILHA: ${sheetName} ===\n`;
+                        jsonData.forEach((row, index) => {
+                            if (row && row.length > 0) {
+                                excelText += `Linha ${index + 1}: ${JSON.stringify(row)}\n`;
+                            }
+                        });
+                        excelText += '\n';
                     });
                     
-                    resolve({
-                        fileName: file.name,
-                        sheets: sheetsData,
-                        sheetNames: workbook.SheetNames
-                    });
+                    resolve(excelText);
                 } catch (error) {
                     reject(error);
                 }
@@ -93,273 +98,122 @@ class SmartComparator {
         btn.disabled = !(this.pdfFile && this.excelFile);
     }
 
-    async analyzeFiles() {
-        this.showLoading(true);
-        
-        try {
-            console.log('🔍 Analisando arquivos...');
-            
-            // Extrai itens do PDF
-            const pdfItems = this.extractItemsFromPDF(this.pdfText);
-            console.log('📄 Itens do PDF:', pdfItems.length);
-            
-            // Extrai itens do Excel
-            const excelItems = this.extractItemsFromExcel(this.excelData);
-            console.log('📊 Itens do Excel:', excelItems.length);
-            
-            // Encontra divergências
-            const divergentes = this.findDivergences(pdfItems, excelItems);
-            
-            // Mostra resultados
-            this.displayDivergences(divergentes);
-            
-        } catch (error) {
-            console.error('❌ Erro na análise:', error);
-            alert('Erro na análise: ' + error.message);
-        } finally {
-            this.showLoading(false);
-        }
+    prepareForChatGPT() {
+        const prompt = this.createChatGPTPrompt();
+        this.displayPrompt(prompt);
     }
 
-    extractItemsFromPDF(pdfText) {
-        const items = [];
-        const lines = pdfText.split('\n');
-        
-        lines.forEach(line => {
-            const trimmed = line.trim();
-            if (trimmed.length < 5) return;
+    createChatGPTPrompt() {
+        return `ANÁLISE URGENTE: LISTA DE MATERIAIS vs ORÇAMENTO
 
-            // Padrão: descrição seguida de número e unidade
-            const pattern = /(.+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm2)/i;
-            const match = trimmed.match(pattern);
-            
-            if (match) {
-                const [, description, quantity, unit] = match;
-                const cleanDesc = this.cleanDescription(description);
-                const cleanQty = this.parseQuantity(quantity);
-                const cleanUnit = this.normalizeUnit(unit);
+POR FAVOR, ANALISE ESTES DOIS ARQUIVOS E IDENTIFIQUE TODAS AS DIVERGÊNCIAS:
 
-                if (cleanDesc && cleanDesc.length > 3 && !isNaN(cleanQty) && cleanQty > 0) {
-                    items.push({ 
-                        description: cleanDesc, 
-                        quantity: cleanQty, 
-                        unit: cleanUnit 
-                    });
-                }
-            }
-        });
+ARQUIVO 1 - LISTA DE MATERIAIS (PDF):
+"""
+${this.pdfText.substring(0, 15000)}...
+"""
 
-        return items;
+ARQUIVO 2 - ORÇAMENTO (EXCEL):
+"""
+${this.excelText.substring(0, 10000)}...
+"""
+
+INSTRUÇÕES CRÍTICAS:
+
+1. EXTRAIA TODOS OS MATERIAIS do PDF (lista de materiais)
+2. IDENTIFIQUE OS CORRESPONDENTES no Excel (orçamento)  
+3. ENCONTRE TODAS AS DIVERGÊNCIAS:
+
+   ❌ QUANTIDADES DIFERENTES: Quando o mesmo material tem quantidades diferentes
+   ⚠️ FALTANDO NO ORÇAMENTO: Materiais do PDF que não estão no Excel
+   📋 EXTRAS NO ORÇAMENTO: Materiais do Excel que não estão no PDF
+
+4. RETORNE APENAS UMA LISTA SIMPLES COM:
+
+✅ Use este formato para CADA divergência:
+
+ITEM: [Nome completo do material]
+LISTA (PDF): [quantidade] [unidade]  
+ORÇAMENTO (Excel): [quantidade] [unidade]
+DIFERENÇA: [+/- diferença]
+STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
+
+EXEMPLOS:
+
+ITEM: CABO ISOLADO PP 3 X 1,5 MM2
+LISTA (PDF): 312.4 m
+ORÇAMENTO (Excel): 300 m  
+DIFERENÇA: -12.4
+STATUS: QUANTIDADE DIFERENTE
+
+ITEM: PLUGUE FÊMEA LUMINARIA LED
+LISTA (PDF): 268 un
+ORÇAMENTO (Excel): NÃO ENCONTRADO
+DIFERENÇA: -268
+STATUS: FALTANDO NO ORÇAMENTO
+
+ITEM: MATERIAL EXTRA EXCEL
+LISTA (PDF): NÃO ENCONTRADO
+ORÇAMENTO (Excel): 50 un
+DIFERENÇA: +50
+STATUS: EXTRA NO ORÇAMENTO
+
+NECESSITO QUE:
+
+- Seja COMPLETO na análise
+- Inclua TODOS os itens divergentes  
+- Mantenha o formato simples acima
+- Não inclua itens que estão corretos
+- Foque apenas nas divergências
+
+COMEÇE AGORA:`;
     }
 
-    extractItemsFromExcel(excelData) {
-        const items = [];
-        
-        excelData.sheetNames.forEach(sheetName => {
-            const sheet = excelData.sheets[sheetName];
-            sheet.forEach((row, index) => {
-                // Colunas: D=Descrição, E=Unidade, F=Quantidade
-                if (row && row.length >= 6 && row[3] && row[5] && !isNaN(parseFloat(row[5]))) {
-                    const description = this.cleanDescription(row[3]);
-                    const quantity = this.parseQuantity(row[5]);
-                    const unit = this.normalizeUnit(row[4] || 'un');
-
-                    if (description && description.length > 3 && !isNaN(quantity) && quantity > 0) {
-                        items.push({ description, quantity, unit });
-                    }
-                }
-            });
-        });
-
-        return items;
-    }
-
-    findDivergences(pdfItems, excelItems) {
-        const divergentes = [];
-        const matchedExcelIndices = new Set();
-
-        // Para cada item do PDF, busca correspondente no Excel
-        pdfItems.forEach(pdfItem => {
-            let bestMatch = null;
-            let bestSimilarity = 0;
-
-            excelItems.forEach((excelItem, excelIndex) => {
-                const similarity = this.calculateSimilarity(pdfItem.description, excelItem.description);
-                
-                if (similarity > bestSimilarity && similarity > 0.6) {
-                    bestSimilarity = similarity;
-                    bestMatch = { item: excelItem, index: excelIndex };
-                }
-            });
-
-            if (bestMatch) {
-                matchedExcelIndices.add(bestMatch.index);
-                const excelItem = bestMatch.item;
-                
-                // Verifica se há divergência (mais de 2% de diferença)
-                const quantityDiff = Math.abs(pdfItem.quantity - excelItem.quantity);
-                const tolerance = pdfItem.quantity * 0.02;
-                
-                if (quantityDiff > tolerance) {
-                    divergentes.push({
-                        item: pdfItem.description,
-                        lista_quantidade: pdfItem.quantity,
-                        orcamento_quantidade: excelItem.quantity,
-                        unidade: pdfItem.unit,
-                        diferenca: excelItem.quantity - pdfItem.quantity,
-                        similaridade: bestSimilarity
-                    });
-                }
-            } else {
-                // Item do PDF não encontrado no Excel
-                divergentes.push({
-                    item: pdfItem.description,
-                    lista_quantidade: pdfItem.quantity,
-                    orcamento_quantidade: 0,
-                    unidade: pdfItem.unit,
-                    diferenca: -pdfItem.quantity,
-                    similaridade: 0,
-                    observacao: 'ITEM NÃO ENCONTRADO NO ORÇAMENTO'
-                });
-            }
-        });
-
-        // Itens do Excel que não foram encontrados no PDF
-        excelItems.forEach((excelItem, index) => {
-            if (!matchedExcelIndices.has(index)) {
-                divergentes.push({
-                    item: excelItem.description,
-                    lista_quantidade: 0,
-                    orcamento_quantidade: excelItem.quantity,
-                    unidade: excelItem.unit,
-                    diferenca: excelItem.quantity,
-                    similaridade: 0,
-                    observacao: 'ITEM EXTRA NO ORÇAMENTO'
-                });
-            }
-        });
-
-        return divergentes;
-    }
-
-    calculateSimilarity(str1, str2) {
-        if (!str1 || !str2) return 0;
-
-        const s1 = this.normalizeText(str1);
-        const s2 = this.normalizeText(str2);
-
-        if (s1 === s2) return 1.0;
-        if (s1.includes(s2) || s2.includes(s1)) return 0.9;
-
-        const words1 = s1.split(/\s+/).filter(w => w.length > 2);
-        const words2 = s2.split(/\s+/).filter(w => w.length > 2);
-        
-        if (words1.length === 0 || words2.length === 0) return 0;
-
-        const commonWords = words1.filter(word => 
-            words2.some(w2 => w2.includes(word) || word.includes(w2))
-        );
-
-        return commonWords.length / Math.max(words1.length, words2.length);
-    }
-
-    displayDivergences(divergentes) {
+    displayPrompt(prompt) {
         const resultsSection = document.getElementById('resultsSection');
         
-        if (divergentes.length === 0) {
-            resultsSection.innerHTML = `
-                <div style="background: #d4edda; color: #155724; padding: 20px; border-radius: 10px; text-align: center;">
-                    <h3>🎉 NENHUMA DIVERGÊNCIA ENCONTRADA!</h3>
-                    <p>Todos os itens estão corretos entre a lista e o orçamento.</p>
-                </div>
-            `;
-        } else {
-            let resultsHTML = `
-                <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <h3>⚠️ ${divergentes.length} DIVERGÊNCIAS ENCONTRADAS</h3>
-                    <p>Itens que precisam de atenção entre a lista e o orçamento:</p>
-                </div>
-
-                <div class="table-container">
-                    <table style="width: 100%; border-collapse: collapse; background: white;">
-                        <thead>
-                            <tr style="background: #dc3545; color: white;">
-                                <th style="padding: 12px; text-align: left; width: 50%;">Item</th>
-                                <th style="padding: 12px; text-align: center; width: 80px;">Unid.</th>
-                                <th style="padding: 12px; text-align: center; width: 100px;">Lista</th>
-                                <th style="padding: 12px; text-align: center; width: 100px;">Orçamento</th>
-                                <th style="padding: 12px; text-align: center; width: 100px;">Diferença</th>
-                                <th style="padding: 12px; text-align: left;">Observação</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-
-            divergentes.forEach(item => {
-                const differenceClass = item.diferenca > 0 ? 'style="color: #28a745; font-weight: bold;"' : 
-                                      item.diferenca < 0 ? 'style="color: #dc3545; font-weight: bold;"' : '';
+        resultsSection.innerHTML = `
+            <div style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                <h3>🧠 COLE ESTE PROMPT NO CHATGPT</h3>
                 
-                const differenceText = item.diferenca > 0 ? `+${item.diferenca}` : item.diferenca;
+                <textarea 
+                    id="chatgptPrompt" 
+                    readonly 
+                    style="width: 100%; height: 400px; padding: 15px; border: 2px solid #3498db; border-radius: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap; background: #f8f9fa;"
+                >${prompt}</textarea>
                 
-                resultsHTML += `
-                    <tr style="border-bottom: 1px solid #dee2e6;">
-                        <td style="padding: 10px;">${item.item}</td>
-                        <td style="padding: 10px; text-align: center;">${item.unidade}</td>
-                        <td style="padding: 10px; text-align: center;">${item.lista_quantidade}</td>
-                        <td style="padding: 10px; text-align: center;">${item.orcamento_quantidade}</td>
-                        <td style="padding: 10px; text-align: center;" ${differenceClass}>${differenceText}</td>
-                        <td style="padding: 10px;">${item.observacao || `Similaridade: ${(item.similaridade * 100).toFixed(0)}%`}</td>
-                    </tr>
-                `;
-            });
-
-            resultsHTML += `
-                        </tbody>
-                    </table>
+                <button onclick="copyToClipboard()" style="padding: 12px 25px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 15px; font-size: 16px;">
+                    📋 Copiar Prompt para ChatGPT
+                </button>
+                
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #2196f3;">
+                    <h4>📋 COMO USAR:</h4>
+                    <ol>
+                        <li><strong>Clique no botão acima</strong> para copiar o prompt</li>
+                        <li><strong>Abra o ChatGPT-4</strong> em outra aba</li>
+                        <li><strong>Cole o prompt</strong> e envie</li>
+                        <li><strong>Aguarde a análise completa</strong> (pode demorar 2-3 minutos)</li>
+                        <li><strong>O ChatGPT vai retornar uma lista limpa</strong> com todas as divergências</li>
+                    </ol>
+                    
+                    <p style="color: #d35400; margin-top: 10px;">
+                        <strong>💡 DICA:</strong> O ChatGPT vai analisar DIRETAMENTE seus arquivos PDF e Excel, 
+                        sem depender da minha extração limitada!
+                    </p>
                 </div>
-            `;
-            
-            resultsSection.innerHTML = resultsHTML;
-        }
+            </div>
+        `;
 
         resultsSection.style.display = 'block';
         resultsSection.scrollIntoView({ behavior: 'smooth' });
-    }
 
-    cleanDescription(desc) {
-        if (typeof desc !== 'string') return '';
-        return desc
-            .replace(/^[-•*]\s*/, '')
-            .replace(/\s+/g, ' ')
-            .replace(/\s*,\s*/g, ', ')
-            .trim();
-    }
-
-    parseQuantity(qty) {
-        if (typeof qty === 'number') return qty;
-        if (typeof qty === 'string') {
-            return parseFloat(qty.replace(',', '.')) || 0;
-        }
-        return 0;
-    }
-
-    normalizeUnit(unit) {
-        if (!unit) return 'un';
-        const unitMap = {
-            'm': 'm', 'un': 'un', 'pç': 'pç', 'mm': 'mm',
-            'metro': 'm', 'unidade': 'un', 'peça': 'pç',
-            'mm2': 'mm²', 'mm²': 'mm²'
+        // Define a função de copiar
+        window.copyToClipboard = () => {
+            const textarea = document.getElementById('chatgptPrompt');
+            textarea.select();
+            document.execCommand('copy');
+            alert('✅ Prompt copiado! Agora cole no ChatGPT-4.');
         };
-        return unitMap[unit.toLowerCase()] || 'un';
-    }
-
-    normalizeText(text) {
-        return text
-            .toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^\w\s]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
     }
 
     showLoading(show) {
@@ -371,5 +225,5 @@ class SmartComparator {
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     new SmartComparator();
-    console.log('✅ Sistema simplificado inicializado!');
+    console.log('✅ Sistema ChatGPT direto inicializado!');
 });
