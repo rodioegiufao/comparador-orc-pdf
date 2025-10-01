@@ -1,4 +1,4 @@
-// script.js - Sistema Completo com ChatGPT
+// script.js - Sistema Completo com ChatGPT (CORRIGIDO)
 class SmartComparator {
     constructor() {
         this.pdfFile = null;
@@ -195,22 +195,22 @@ Responda APENAS com um JSON válido:
 
 {
   "resumo": {
-    "total_itens_pdf": número,
-    "total_itens_excel": número,
-    "itens_corretos": número,
-    "itens_divergentes": número,
-    "itens_faltando_orcamento": número,
-    "itens_faltando_lista": número,
-    "taxa_acerto": "XX%"
+    "total_itens_pdf": 0,
+    "total_itens_excel": 0,
+    "itens_corretos": 0,
+    "itens_divergentes": 0,
+    "itens_faltando_orcamento": 0,
+    "itens_faltando_lista": 0,
+    "taxa_acerto": "0%"
   },
   "comparacao": [
     {
       "item": "descrição completa do material",
-      "lista_quantidade": número ou null,
-      "orcamento_quantidade": número ou null,
-      "unidade": "un|m|pç|etc",
-      "status": "CORRETO|DIVERGENTE|FALTANDO_NO_ORCAMENTO|FALTANDO_NA_LISTA",
-      "diferenca": número,
+      "lista_quantidade": 0,
+      "orcamento_quantidade": 0,
+      "unidade": "un",
+      "status": "CORRETO",
+      "diferenca": 0,
       "observacao": "explicação detalhada da comparação"
     }
   ],
