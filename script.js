@@ -1,4 +1,4 @@
-// script.js - Sistema com Análise Automática como Backup
+// script.js - Sistema Completo Corrigido
 class SmartComparator {
     constructor() {
         this.pdfFile = null;
@@ -12,6 +12,244 @@ class SmartComparator {
 
     init() {
         this.bindEvents();
+        this.defineGlobalFunctions();
+    }
+
+    defineGlobalFunctions() {
+        // Define todas as funções globais
+        window.copyToClipboard = (elementId) => {
+            const textarea = document.getElementById(elementId);
+            textarea.select();
+            document.execCommand('copy');
+            alert('✅ Prompt copiado para a área de transferência!');
+        };
+
+        window.processGPTResponse = () => {
+            const responseText = document.getElementById('chatgptResponse').value;
+            if (!responseText.trim()) {
+                alert('Por favor, cole a resposta do ChatGPT primeiro.');
+                return;
+            }
+
+            try {
+                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    const resultData = JSON.parse(jsonMatch[0]);
+                    this.displayResults(resultData);
+                } else {
+                    throw new Error('JSON não encontrado na resposta. Certifique-se de copiar TODA a resposta do ChatGPT.');
+                }
+            } catch (error) {
+                console.error('Erro ao processar resposta:', error);
+                alert('❌ Erro ao processar a resposta:\n\n' + error.message + '\n\nVerifique se copiou toda a resposta JSON do ChatGPT.');
+            }
+        };
+
+        window.runAutomaticAnalysis = () => {
+            if (!window.smartComparator) {
+                alert('Sistema não inicializado.');
+                return;
+            }
+            window.smartComparator.runAutomaticAnalysis();
+        };
+
+        window.testWithCompleteMockData = () => {
+            const mockData = {
+                "resumo": {
+                    "total_itens_pdf": 85,
+                    "total_itens_excel": 73,
+                    "itens_corretos": 45,
+                    "itens_divergentes": 28,
+                    "itens_faltando_orcamento": 12,
+                    "itens_faltando_lista": 5,
+                    "taxa_acerto": "52.9%"
+                },
+                "comparacao": [
+                    {
+                        "item": "CABO ISOLADO PP 3 X 1,5 MM2",
+                        "lista_quantidade": 312.4,
+                        "orcamento_quantidade": 312.4,
+                        "unidade": "m",
+                        "status": "CORRETO",
+                        "diferenca": 0,
+                        "observacao": "Quantidades coincidem perfeitamente"
+                    },
+                    {
+                        "item": "ELETRODUTO FLEXÍVEL CORRUGADO, 3/4\", INSTALADO NO PISO",
+                        "lista_quantidade": 82.9,
+                        "orcamento_quantidade": 82.9,
+                        "unidade": "m",
+                        "status": "CORRETO", 
+                        "diferenca": 0,
+                        "observacao": "Quantidades coincidem"
+                    },
+                    {
+                        "item": "CAIXA DE PASSAGEM PVC 4X2\"",
+                        "lista_quantidade": 21,
+                        "orcamento_quantidade": 20,
+                        "unidade": "un",
+                        "status": "DIVERGENTE",
+                        "diferenca": -1,
+                        "observacao": "PDF: 21 un vs Excel: 20 un"
+                    },
+                    {
+                        "item": "PLUGUE FÊMEA LUMINARIA LED",
+                        "lista_quantidade": 268,
+                        "orcamento_quantidade": null,
+                        "unidade": "un", 
+                        "status": "FALTANDO_NO_ORCAMENTO",
+                        "diferenca": -268,
+                        "observacao": "Item não encontrado no orçamento"
+                    },
+                    {
+                        "item": "ITEM EXTRA NO EXCEL",
+                        "lista_quantidade": null,
+                        "orcamento_quantidade": 50,
+                        "unidade": "un",
+                        "status": "FALTANDO_NA_LISTA", 
+                        "diferenca": 50,
+                        "observacao": "Item extra no orçamento"
+                    }
+                ],
+                "recomendacoes": [
+                    "Ajustar 28 itens com quantidades divergentes",
+                    "Incluir 12 itens faltantes no orçamento", 
+                    "Verificar 5 itens extras no Excel",
+                    "Realizar revisão final antes da aprovação"
+                ]
+            };
+            
+            // Adiciona mais itens mock
+            for (let i = 6; i <= 30; i++) {
+                const statuses = ['CORRETO', 'DIVERGENTE', 'FALTANDO_NO_ORCAMENTO', 'FALTANDO_NA_LISTA'];
+                const status = statuses[Math.floor(Math.random() * statuses.length)];
+                
+                mockData.comparacao.push({
+                    "item": `ITEM EXEMPLO ${i} - MATERIAL ELÉTRICO`,
+                    "lista_quantidade": status !== 'FALTANDO_NA_LISTA' ? Math.random() * 100 : null,
+                    "orcamento_quantidade": status !== 'FALTANDO_NO_ORCAMENTO' ? Math.random() * 100 : null,
+                    "unidade": "un",
+                    "status": status,
+                    "diferenca": 0,
+                    "observacao": `Item de exemplo ${i} - Status: ${status}`
+                });
+            }
+            
+            this.displayResults(mockData);
+            alert('✅ Teste com dados completos! ' + mockData.comparacao.length + ' itens carregados.');
+        };
+
+        // Funções de filtro
+        window.filterTable = (filter) => {
+            const rows = document.querySelectorAll('#comparisonTable tbody tr');
+            const buttons = document.querySelectorAll('.filter-btn');
+            
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            rows.forEach(row => {
+                const status = row.getAttribute('data-status');
+                let show = false;
+                
+                switch(filter) {
+                    case 'all': show = true; break;
+                    case 'CORRETO': show = status === 'CORRETO'; break;
+                    case 'DIVERGENTE': show = status === 'DIVERGENTE'; break;
+                    case 'FALTANDO': show = status.includes('FALTANDO'); break;
+                }
+                
+                row.style.display = show ? '' : 'none';
+            });
+        };
+
+        // Funções de exportação
+        window.exportToExcel = () => {
+            if (!window.smartComparator || !window.smartComparator.results) {
+                alert('Nenhum resultado para exportar.');
+                return;
+            }
+            
+            const results = window.smartComparator.results;
+            
+            // Cria workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Sheet de resumo
+            const summaryData = [
+                ['RELATÓRIO DE ANÁLISE DE COMPATIBILIDADE'],
+                ['Data:', new Date().toLocaleDateString()],
+                [],
+                ['RESUMO'],
+                ['Itens na Lista (PDF):', results.resumo.total_itens_pdf],
+                ['Itens no Orçamento (Excel):', results.resumo.total_itens_excel],
+                ['Itens Corretos:', results.resumo.itens_corretos],
+                ['Itens Divergentes:', results.resumo.itens_divergentes],
+                ['Itens Faltantes no Orçamento:', results.resumo.itens_faltando_orcamento],
+                ['Itens Faltantes na Lista:', results.resumo.itens_faltando_lista],
+                ['Taxa de Acerto:', results.resumo.taxa_acerto],
+                [],
+                ['RECOMENDAÇÕES'],
+                ...results.recomendacoes.map(rec => [rec])
+            ];
+            
+            const ws_summary = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, ws_summary, "Resumo");
+            
+            // Sheet de comparação detalhada
+            const comparisonData = [
+                ['Status', 'Item', 'Unidade', 'Quantidade Lista', 'Quantidade Orçamento', 'Diferença', 'Observação']
+            ];
+            
+            results.comparacao.forEach(item => {
+                const status = item.status === 'CORRETO' ? 'CORRETO' : 
+                              item.status === 'DIVERGENTE' ? 'DIVERGENTE' : 
+                              item.status === 'FALTANDO_NO_ORCAMENTO' ? 'FALTANDO NO ORÇAMENTO' : 'FALTANDO NA LISTA';
+                
+                comparisonData.push([
+                    status,
+                    item.item,
+                    item.unidade || '-',
+                    item.lista_quantidade !== null && item.lista_quantidade !== undefined ? item.lista_quantidade : '-',
+                    item.orcamento_quantidade !== null && item.orcamento_quantidade !== undefined ? item.orcamento_quantidade : '-',
+                    item.diferenca !== null && item.diferenca !== undefined ? item.diferenca : '-',
+                    item.observacao
+                ]);
+            });
+            
+            const ws_comparison = XLSX.utils.aoa_to_sheet(comparisonData);
+            XLSX.utils.book_append_sheet(wb, ws_comparison, "Comparação Detalhada");
+            
+            // Exporta
+            const fileName = 'relatorio_analise_' + new Date().getTime() + '.xlsx';
+            XLSX.writeFile(wb, fileName);
+            
+            alert('✅ Relatório exportado para Excel: ' + fileName);
+        };
+
+        window.exportToJSON = () => {
+            if (!window.smartComparator || !window.smartComparator.results) {
+                alert('Nenhum resultado para exportar.');
+                return;
+            }
+            
+            const dataStr = JSON.stringify(window.smartComparator.results, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = 'analise_comparativa_' + new Date().getTime() + '.json';
+            link.click();
+        };
+
+        window.showRawData = () => {
+            if (!window.smartComparator || !window.smartComparator.results) {
+                alert('Nenhum resultado disponível.');
+                return;
+            }
+            
+            console.log('📊 Dados completos:', window.smartComparator.results);
+            alert('Dados completos disponíveis no console (F12 → Console)');
+        };
     }
 
     bindEvents() {
@@ -51,41 +289,32 @@ class SmartComparator {
         const items = [];
         const lines = pdfText.split('\n');
         
-        // Padrões para identificar itens no PDF
-        const patterns = [
-            /(.+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm2)/i,
-            /(\d+[.,]\d+|\d+)\s*(m|un|pç)\s+(.+)/i
-        ];
-
         lines.forEach(line => {
             const trimmed = line.trim();
             if (trimmed.length < 5) return;
 
-            for (const pattern of patterns) {
-                const match = trimmed.match(pattern);
-                if (match) {
-                    let description, quantity, unit;
+            // Padrão: descrição seguida de número e unidade
+            const pattern = /(.+?)\s+(\d+[.,]\d+|\d+)\s*(m|un|pç|mm|mm2)/i;
+            const match = trimmed.match(pattern);
+            
+            if (match) {
+                const [, description, quantity, unit] = match;
+                const cleanDesc = this.cleanDescription(description);
+                const cleanQty = this.parseQuantity(quantity);
+                const cleanUnit = this.normalizeUnit(unit);
 
-                    if (pattern === patterns[1]) {
-                        [, quantity, unit, description] = match;
-                    } else {
-                        [, description, quantity, unit] = match;
-                    }
-
-                    description = this.cleanDescription(description);
-                    quantity = this.parseQuantity(quantity);
-                    unit = this.normalizeUnit(unit);
-
-                    if (description && description.length > 3 && !isNaN(quantity) && quantity > 0) {
-                        // Evita duplicatas
-                        const existing = items.find(item => 
-                            item.description === description && item.quantity === quantity
-                        );
-                        
-                        if (!existing) {
-                            items.push({ description, quantity, unit });
-                        }
-                        break;
+                if (cleanDesc && cleanDesc.length > 3 && !isNaN(cleanQty) && cleanQty > 0) {
+                    // Evita duplicatas
+                    const existing = items.find(item => 
+                        item.description === cleanDesc && item.quantity === cleanQty
+                    );
+                    
+                    if (!existing) {
+                        items.push({ 
+                            description: cleanDesc, 
+                            quantity: cleanQty, 
+                            unit: cleanUnit 
+                        });
                     }
                 }
             }
@@ -346,7 +575,7 @@ RETORNE APENAS JSON:`;
                     </ul>
                     <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;">
                         <strong>💡 Dica:</strong> Se o ChatGPT não retornar análise completa, use o botão 
-                        <strong>"🔄 Análise Automática"</strong> abaixo como alternativa.
+                        <strong>"🤖 Análise Automática"</strong> abaixo como alternativa.
                     </div>
                 </div>
             </div>
@@ -512,118 +741,123 @@ RETORNE APENAS JSON:`;
             .trim();
     }
 
+    displayResults(resultData) {
+        this.results = resultData;
+        const resultsSection = document.getElementById('resultsSection');
+        
+        let resultsHTML = `
+            <div class="summary-cards">
+                <div class="card total">
+                    <h3>Total Itens</h3>
+                    <div class="number">${resultData.resumo.total_itens_pdf + resultData.resumo.total_itens_excel}</div>
+                </div>
+                <div class="card match">
+                    <h3>✅ Corretos</h3>
+                    <div class="number">${resultData.resumo.itens_corretos}</div>
+                </div>
+                <div class="card mismatch">
+                    <h3>❌ Divergentes</h3>
+                    <div class="number">${resultData.resumo.itens_divergentes}</div>
+                </div>
+                <div class="card missing">
+                    <h3>⚠️ Faltantes</h3>
+                    <div class="number">${resultData.resumo.itens_faltando_orcamento + resultData.resumo.itens_faltando_lista}</div>
+                </div>
+            </div>
+
+            <div class="analysis-info">
+                <h3>📋 Relatório de Análise</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Itens na Lista (PDF):</strong> ${resultData.resumo.total_itens_pdf}
+                    </div>
+                    <div class="info-item">
+                        <strong>Itens no Orçamento (Excel):</strong> ${resultData.resumo.total_itens_excel}
+                    </div>
+                    <div class="info-item">
+                        <strong>Taxa de Acerto:</strong> ${resultData.resumo.taxa_acerto}
+                    </div>
+                    <div class="info-item">
+                        <strong>Itens Analisados:</strong> ${resultData.comparacao.length}
+                    </div>
+                </div>
+            </div>
+
+            <div class="filters">
+                <button class="filter-btn active" onclick="filterTable('all')">Todos</button>
+                <button class="filter-btn" onclick="filterTable('CORRETO')">✅ Corretos</button>
+                <button class="filter-btn" onclick="filterTable('DIVERGENTE')">❌ Divergentes</button>
+                <button class="filter-btn" onclick="filterTable('FALTANDO')">⚠️ Faltantes</button>
+            </div>
+
+            <div class="table-container">
+                <table id="comparisonTable">
+                    <thead>
+                        <tr>
+                            <th width="50">Status</th>
+                            <th width="250">Item</th>
+                            <th width="60">Unid.</th>
+                            <th width="80">Lista</th>
+                            <th width="80">Orçamento</th>
+                            <th width="80">Diferença</th>
+                            <th>Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        resultData.comparacao.forEach(function(item, index) {
+            const statusIcon = item.status === 'CORRETO' ? '✅' : 
+                              item.status === 'DIVERGENTE' ? '❌' : 
+                              item.status === 'FALTANDO_NO_ORCAMENTO' ? '⚠️' : '📋';
+            
+            const differenceClass = item.diferenca > 0 ? 'difference-positive' : 
+                                  item.diferenca < 0 ? 'difference-negative' : '';
+
+            resultsHTML += `
+                <tr data-status="${item.status}" data-index="${index}">
+                    <td>${statusIcon}</td>
+                    <td title="${item.item}">${item.item.length > 60 ? item.item.substring(0, 60) + '...' : item.item}</td>
+                    <td>${item.unidade || '-'}</td>
+                    <td>${item.lista_quantidade !== null && item.lista_quantidade !== undefined ? item.lista_quantidade : '-'}</td>
+                    <td>${item.orcamento_quantidade !== null && item.orcamento_quantidade !== undefined ? item.orcamento_quantidade : '-'}</td>
+                    <td class="${differenceClass}">${item.diferenca > 0 ? '+' : ''}${item.diferenca !== null && item.diferenca !== undefined ? item.diferenca : '-'}</td>
+                    <td>${item.observacao}</td>
+                </tr>
+            `;
+        });
+
+        resultsHTML += `
+                </tbody>
+            </table>
+        </div>
+
+        <div class="recommendations">
+            <h3>💡 Recomendações</h3>
+            <ul>
+                ${resultData.recomendacoes.map(function(rec) { return '<li>' + rec + '</li>'; }).join('')}
+            </ul>
+        </div>
+
+        <div class="export-section">
+            <button onclick="exportToExcel()" class="export-btn">📊 Exportar para Excel</button>
+            <button onclick="exportToJSON()" class="details-btn">📁 Exportar JSON</button>
+            <button onclick="showRawData()" class="details-btn">🔍 Ver Dados Completos</button>
+        </div>
+    `;
+
+    resultsSection.innerHTML = resultsHTML;
+    }
+
     showLoading(show) {
         document.getElementById('loading').style.display = show ? 'block' : 'none';
         document.getElementById('analyzeBtn').disabled = show;
     }
 }
 
-// [MANTENHA TODAS AS OUTRAS FUNÇÕES GLOBAIS DO CÓDIGO ANTERIOR]
-// window.copyToClipboard, window.processGPTResponse, window.filterTable, 
-// window.exportToExcel, window.exportToJSON, etc.
-
-// Nova função para análise automática
-window.runAutomaticAnalysis = function() {
-    if (!window.smartComparator) {
-        alert('Sistema não inicializado.');
-        return;
-    }
-    window.smartComparator.runAutomaticAnalysis();
-};
-
-// Novo teste com dados completos
-window.testWithCompleteMockData = function() {
-    const mockData = {
-        "resumo": {
-            "total_itens_pdf": 85,
-            "total_itens_excel": 73,
-            "itens_corretos": 45,
-            "itens_divergentes": 28,
-            "itens_faltando_orcamento": 12,
-            "itens_faltando_lista": 5,
-            "taxa_acerto": "52.9%"
-        },
-        "comparacao": [
-            {
-                "item": "CABO ISOLADO PP 3 X 1,5 MM2",
-                "lista_quantidade": 312.4,
-                "orcamento_quantidade": 312.4,
-                "unidade": "m",
-                "status": "CORRETO",
-                "diferenca": 0,
-                "observacao": "Quantidades coincidem perfeitamente"
-            },
-            {
-                "item": "ELETRODUTO FLEXÍVEL CORRUGADO, 3/4\", INSTALADO NO PISO",
-                "lista_quantidade": 82.9,
-                "orcamento_quantidade": 82.9,
-                "unidade": "m",
-                "status": "CORRETO", 
-                "diferenca": 0,
-                "observacao": "Quantidades coincidem"
-            },
-            {
-                "item": "CAIXA DE PASSAGEM PVC 4X2\"",
-                "lista_quantidade": 21,
-                "orcamento_quantidade": 20,
-                "unidade": "un",
-                "status": "DIVERGENTE",
-                "diferenca": -1,
-                "observacao": "PDF: 21 un vs Excel: 20 un"
-            },
-            {
-                "item": "PLUGUE FÊMEA LUMINARIA LED",
-                "lista_quantidade": 268,
-                "orcamento_quantidade": null,
-                "unidade": "un", 
-                "status": "FALTANDO_NO_ORCAMENTO",
-                "diferenca": -268,
-                "observacao": "Item não encontrado no orçamento"
-            },
-            {
-                "item": "ITEM EXTRA NO EXCEL",
-                "lista_quantidade": null,
-                "orcamento_quantidade": 50,
-                "unidade": "un",
-                "status": "FALTANDO_NA_LISTA", 
-                "diferenca": 50,
-                "observacao": "Item extra no orçamento"
-            }
-            // ... adicione mais itens mock aqui para testar
-        ],
-        "recomendacoes": [
-            "Ajustar 28 itens com quantidades divergentes",
-            "Incluir 12 itens faltantes no orçamento", 
-            "Verificar 5 itens extras no Excel",
-            "Realizar revisão final antes da aprovação"
-        ]
-    };
-    
-    // Adiciona mais itens mock para simular análise completa
-    for (let i = 6; i <= 50; i++) {
-        const statuses = ['CORRETO', 'DIVERGENTE', 'FALTANDO_NO_ORCAMENTO', 'FALTANDO_NA_LISTA'];
-        const status = statuses[Math.floor(Math.random() * statuses.length)];
-        
-        mockData.comparacao.push({
-            "item": `ITEM EXEMPLO ${i} - MATERIAL ELÉTRICO`,
-            "lista_quantidade": status !== 'FALTANDO_NA_LISTA' ? Math.random() * 100 : null,
-            "orcamento_quantidade": status !== 'FALTANDO_NO_ORCAMENTO' ? Math.random() * 100 : null,
-            "unidade": "un",
-            "status": status,
-            "diferenca": 0,
-            "observacao": `Item de exemplo ${i} - Status: ${status}`
-        });
-    }
-    
-    window.smartComparator.displayResults(mockData);
-    alert('✅ Teste com dados completos! ' + mockData.comparacao.length + ' itens carregados.');
-};
-
-// [MANTENHA O RESTO DO CÓDIGO IGUAL...]
-
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     window.smartComparator = new SmartComparator();
     window.smartComparator.init();
-    console.log('✅ Sistema com análise automática inicializado!');
+    console.log('✅ Sistema com funções globais corrigidas!');
 });
