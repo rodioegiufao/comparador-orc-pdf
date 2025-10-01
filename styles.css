@@ -530,3 +530,9 @@ tbody tr:hover {
     font-family: monospace;
     font-size: 0.8rem;
 }
+.status-mismatch { color: #e74c3c; font-weight: bold; background: #fdedec; padding: 4px 8px; border-radius: 4px; }
+.status-missing { color: #f39c12; font-weight: bold; background: #fef5e7; padding: 4px 8px; border-radius: 4px; }
+.status-extra { color: #3498db; font-weight: bold; background: #ebf5fb; padding: 4px 8px; border-radius: 4px; }
+
+.difference-positive { color: #27ae60; font-weight: bold; }
+.difference-negative { color: #e74c3c; font-weight: bold; }
