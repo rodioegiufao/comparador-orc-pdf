@@ -1,11 +1,10 @@
-// script.js - Versão Simplificada
-// script.js - Versão Inteligente para Formatações Diferentes
+// script.js - Versão Corrigida para Comparar Dois Excel
 class SmartComparator {
     constructor() {
-        this.pdfFile = null;
-        this.excelFile = null;
-        this.pdfText = '';
-        this.excelText = '';
+        this.materialsFile = null;
+        this.budgetFile = null;
+        this.materialsData = '';
+        this.budgetData = '';
     }
 
     init() {
@@ -13,8 +12,8 @@ class SmartComparator {
     }
 
     bindEvents() {
-        document.getElementById('pdfFile').addEventListener('change', (e) => this.handleFileUpload(e, 'pdf'));
-        document.getElementById('excelFile').addEventListener('change', (e) => this.handleFileUpload(e, 'excel'));
+        document.getElementById('materialsFile').addEventListener('change', (e) => this.handleFileUpload(e, 'materials'));
+        document.getElementById('budgetFile').addEventListener('change', (e) => this.handleFileUpload(e, 'budget'));
         document.getElementById('analyzeBtn').addEventListener('click', () => this.prepareForChatGPT());
     }
 
@@ -31,16 +30,16 @@ class SmartComparator {
         previewElement.innerHTML = '<p><strong>' + file.name + '</strong> - Carregando...</p>';
 
         try {
-            if (type === 'pdf') {
-                this.pdfFile = file;
-                this.pdfText = await this.extractPDFText(file);
-                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - PDF carregado</small>';
-                console.log('PDF carregado com sucesso');
+            if (type === 'materials') {
+                this.materialsFile = file;
+                this.materialsData = await this.extractExcelData(file, 'LISTA DE MATERIAIS');
+                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - Lista carregada</small>';
+                console.log('Lista de materiais carregada com sucesso');
             } else {
-                this.excelFile = file;
-                this.excelText = await this.extractExcelText(file);
-                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - Excel carregado</small>';
-                console.log('Excel carregado com sucesso');
+                this.budgetFile = file;
+                this.budgetData = await this.extractExcelData(file, 'ORÇAMENTO');
+                previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - Orçamento carregado</small>';
+                console.log('Orçamento carregado com sucesso');
             }
         } catch (error) {
             console.error('Erro ao processar ' + type + ':', error);
@@ -50,30 +49,8 @@ class SmartComparator {
         }
     }
 
-    async extractPDFText(file) {
-        console.log('Extraindo texto do PDF...');
-        try {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-            let fullText = '';
-
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
-                fullText += pageText + '\n';
-            }
-
-            console.log('PDF extraído:', fullText.length, 'caracteres');
-            return fullText;
-        } catch (error) {
-            console.error('Erro na extração PDF:', error);
-            throw error;
-        }
-    }
-
-    async extractExcelText(file) {
-        console.log('Extraindo texto do Excel...');
+    async extractExcelData(file, type) {
+        console.log('Extraindo dados do Excel (' + type + ')...');
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             
@@ -82,30 +59,31 @@ class SmartComparator {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    let excelText = '';
+                    let excelData = '';
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
                         
-                        excelText += `=== PLANILHA: ${sheetName} ===\n`;
+                        excelData += `=== ${type} - PLANILHA: ${sheetName} ===\n`;
+                        
                         jsonData.forEach((row, index) => {
                             if (row && row.length > 0) {
-                                // Foca nas colunas D, E, F (índices 3, 4, 5)
-                                const descricao = row[3] || ''; // Coluna D
-                                const unidade = row[4] || '';   // Coluna E
-                                const quantidade = row[5] || ''; // Coluna F
-                                
-                                if (descricao || unidade || quantidade) {
-                                    excelText += `LINHA ${index + 1}: "${descricao}" | ${unidade} | ${quantidade}\n`;
-                                }
+                                // Extrai todas as colunas para análise
+                                let rowText = `LINHA ${index + 1}: `;
+                                row.forEach((cell, cellIndex) => {
+                                    if (cell !== '' && cell !== null && cell !== undefined) {
+                                        rowText += `[Col ${cellIndex + 1}] "${cell}" | `;
+                                    }
+                                });
+                                excelData += rowText + '\n';
                             }
                         });
-                        excelText += '\n';
+                        excelData += '\n';
                     });
                     
-                    console.log('Excel extraído:', excelText.length, 'caracteres');
-                    resolve(excelText);
+                    console.log(type + ' extraído:', excelData.length, 'caracteres');
+                    resolve(excelData);
                 } catch (error) {
                     console.error('Erro na extração Excel:', error);
                     reject(error);
@@ -123,7 +101,7 @@ class SmartComparator {
 
     checkFilesReady() {
         const btn = document.getElementById('analyzeBtn');
-        const isReady = this.pdfFile && this.excelFile;
+        const isReady = this.materialsFile && this.budgetFile;
         
         btn.disabled = !isReady;
     }
@@ -131,8 +109,8 @@ class SmartComparator {
     prepareForChatGPT() {
         console.log('Preparando prompt para ChatGPT...');
         
-        if (!this.pdfFile || !this.excelFile) {
-            alert('❌ Por favor, carregue ambos os arquivos primeiro.');
+        if (!this.materialsFile || !this.budgetFile) {
+            alert('❌ Por favor, carregue ambos os arquivos Excel primeiro.');
             return;
         }
 
@@ -141,68 +119,65 @@ class SmartComparator {
     }
 
     createChatGPTPrompt() {
-        return `ANÁLISE ESPECIALIZADA: LISTA DE MATERIAIS vs ORÇAMENTO
+        return `ANÁLISE ESPECIALIZADA: LISTA DE MATERIAIS vs ORÇAMENTO SINTÉTICO
 
-IMPORTANTE - FORMATOS DIFERENTES:
+IMPORTANTE - AMBOS OS ARQUIVOS SÃO EXCEL:
 
-📄 PDF (LISTA DE MATERIAIS):
-- Todo o texto está em BLOCO CONTÍNUO, sem quebras organizadas
-- Você precisa IDENTIFICAR os materiais e quantidades no meio do texto corrido
-- Procure por padrões como: "quantidade", "un", "m", "kg", números seguidos de unidades
+📋 LISTA DE MATERIAIS (Excel):
+- Estruturado em colunas
+- Contém todos os materiais necessários
 
-📊 EXCEL (ORÇAMENTO):
-- Estruturado em COLUNAS:
-  * Coluna D: DESCRIÇÃO do material
-  * Coluna E: UNIDADE (un, m, kg, etc)
-  * Coluna F: QUANTIDADE numérica
+📊 ORÇAMENTO SINTÉTICO (Excel):
+- Estruturado em colunas  
+- Contém os materiais orçados
 
 SEU OBJETIVO: Encontrar TODAS as divergências entre os dois documentos.
 
 DADOS PARA ANÁLISE:
 
-=== PDF - LISTA DE MATERIAIS (TEXTO CORRIDO) ===
-${this.pdfText}
+=== LISTA DE MATERIAIS (EXCEL) ===
+${this.materialsData}
 
-=== EXCEL - ORÇAMENTO (ESTRUTURADO) ===  
-${this.excelText}
+=== ORÇAMENTO SINTÉTICO (EXCEL) ===  
+${this.budgetData}
 
 INSTRUÇÕES DETALHADAS:
 
-1. NO PDF: Extraia cada material e sua quantidade do texto corrido
-2. NO EXCEL: Use as colunas D (descrição), E (unidade), F (quantidade)
-3. COMPARE: Encontre correspondências pelos nomes dos materiais
+1. Analise AMBOS os arquivos Excel
+2. Encontre correspondências pelos nomes dos materiais
+3. Compare as quantidades e unidades
 4. IDENTIFIQUE:
    - 🔴 Quantidades DIFERENTES para o mesmo material
-   - 🟡 Materiais no PDF mas NÃO no Excel (FALTANDO)
-   - 🔵 Materiais no Excel mas NÃO no PDF (EXTRAS)
+   - 🟡 Materiais na Lista mas NÃO no Orçamento (FALTANDO)
+   - 🔵 Materiais no Orçamento mas NÃO na Lista (EXTRAS)
 
 FORMATO DE RESPOSTA (OBRIGATÓRIO):
 
 Para CADA divergência encontrada:
 
 ITEM: [Nome do material]
-LISTA (PDF): [quantidade] [unidade]
-ORÇAMENTO (Excel): [quantidade] [unidade]
+LISTA DE MATERIAIS: [quantidade] [unidade]
+ORÇAMENTO: [quantidade] [unidade]
 DIFERENÇA: [+/- valor da diferença]
 STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
 
 EXEMPLOS:
 
 ITEM: CABO ELÉTRICO 2,5mm
-LISTA (PDF): 150 m
-ORÇAMENTO (Excel): 120 m
+LISTA DE MATERIAIS: 150 m
+ORÇAMENTO: 120 m
 DIFERENÇA: -30
 STATUS: QUANTIDADE DIFERENTE
 
 ITEM: LUMINÁRIA LED
-LISTA (PDF): 25 un
-ORÇAMENTO (Excel): NÃO ENCONTRADO
+LISTA DE MATERIAIS: 25 un
+ORÇAMENTO: NÃO ENCONTRADO
 DIFERENÇA: -25
 STATUS: FALTANDO NO ORÇAMENTO
 
 ITEM: PARAFUSO SExtra
-LISTA (PDF): NÃO ENCONTRADO
-ORÇAMENTO (Excel): 100 un
+LISTA DE MATERIAIS: NÃO ENCONTRADO
+ORÇAMENTO: 100 un
 DIFERENÇA: +100
 STATUS: EXTRA NO ORÇAMENTO
 
@@ -236,10 +211,10 @@ COMEÇE A ANÁLISE:`;
                 <div class="instructions">
                     <h4>🎯 DICAS PARA ANÁLISE PRECISA:</h4>
                     <ul>
-                        <li><strong>PDF:</strong> Texto corrido - o ChatGPT precisa caçar os materiais no meio do texto</li>
-                        <li><strong>Excel:</strong> Estruturado - colunas D, E, F são as importantes</li>
+                        <li><strong>Ambos os arquivos são Excel</strong> - muito mais fácil de analisar!</li>
                         <li><strong>Foque</strong> em encontrar NOMES SIMILARES de materiais</li>
                         <li><strong>Ignore</strong> pequenas diferenças de escrita nos nomes</li>
+                        <li><strong>Compare</strong> quantidades e unidades para cada material</li>
                     </ul>
                 </div>
             </div>
@@ -263,8 +238,6 @@ COMEÇE A ANÁLISE:`;
     }
 }
 
-// [MANTENHA AS FUNÇÕES processChatGPTResponse, displayProcessedResults, etc QUE JÁ TINHAMOS]
-// ... (as funções de processamento de resposta permanecem iguais)
 // Funções para processar a resposta do ChatGPT
 function processChatGPTResponse() {
     const responseText = document.getElementById('chatgptResponse').value.trim();
@@ -314,8 +287,8 @@ function displayProcessedResults(responseText) {
                             <thead>
                                 <tr>
                                     <th>Item</th>
-                                    <th>Lista (PDF)</th>
-                                    <th>Orçamento (Excel)</th>
+                                    <th>Lista de Materiais</th>
+                                    <th>Orçamento</th>
                                     <th>Diferença</th>
                                     <th>Status</th>
                                 </tr>
@@ -368,11 +341,11 @@ function extractItemsFromResponse(text) {
             if (currentItem.item) items.push(currentItem);
             currentItem = { item: line.replace('ITEM:', '').trim() };
         }
-        else if (line.startsWith('LISTA (PDF):')) {
-            currentItem.lista = line.replace('LISTA (PDF):', '').trim();
+        else if (line.startsWith('LISTA DE MATERIAIS:')) {
+            currentItem.lista = line.replace('LISTA DE MATERIAIS:', '').trim();
         }
-        else if (line.startsWith('ORÇAMENTO (Excel):')) {
-            currentItem.orçamento = line.replace('ORÇAMENTO (Excel):', '').trim();
+        else if (line.startsWith('ORÇAMENTO:')) {
+            currentItem.orçamento = line.replace('ORÇAMENTO:', '').trim();
         }
         else if (line.startsWith('DIFERENÇA:')) {
             currentItem.diferenca = line.replace('DIFERENÇA:', '').trim();
