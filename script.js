@@ -232,29 +232,23 @@ class SmartComparator {
     - Coluna E: UNIDADE
     - Coluna F: QUANTIDADE
     
-    ESTRATÉGIA DE CORRESPONDÊNCIA - REGRAS CRÍTICAS PARA CABOS:
+    ESTRATÉGIA DE CORRESPONDÊNCIA - REGRAS CRÍTICAS:
     
-    1. **AGRUPAMENTO DE CABOS POR BITOLA:**
-       - Quando encontrar cabos da MESMA BITOLA mas cores diferentes na Lista de Materiais, SOME as quantidades
-       - Exemplo: 
-         * Cabo 16mm² Azul: 51.2 m
-         * Cabo 16mm² Branco: 51.2 m  
-         * Cabo 16mm² Preto: 51.2 m
-         * Cabo 16mm² Verde: 51.2 m
-         * Cabo 16mm² Vermelho: 40.7 m
-         → TOTAL: 51.2 + 51.2 + 51.2 + 51.2 + 40.7 = 245.5 m
+    1. **CABOS UNIPOLARES (Lista de Materiais):**
+       - Agrupe por BITOLA específica: 1.5mm², 2.5mm², 4mm², 16mm²
+       - SOME apenas cabos da MESMA BITOLA
+       - Exemplo para 2.5mm²: Some apenas as linhas que têm "2.5 mm²" no Item
+       - Exemplo para 4mm²: Some apenas as linhas que têm "4 mm²" no Item
     
-    2. **CORRESPONDÊNCIA COM ORÇAMENTO:**
-       - No Orçamento, procure por descrições como: "CABO", "16 MM²", "16mm²", "bitola 16"
-       - Ignore diferenças de cores, marcas e descrições detalhadas
-       - Foque na BITOLA e no TIPO DE CABO
+    2. **CABOS MULTICONDUCTORES (Orçamento):**
+       - Procure por cabos multipolares como: "CABO ISOLADO PP 3 X 1,5 MM2" = 3 condutores de 1.5mm²
+       - Para cabos multipolares, a bitola é individual por condutor
     
-    3. **PADRÕES DE BUSCA NO ORÇAMENTO:**
-       - Procure por: "CABO", "FIO", "CONDUTOR", "ELÉTRICO"
-       - Combine com bitolas: "1.5", "2.5", "4", "6", "10", "16", "25", "35", "50", "70", "95", "120", "150", "185", "240" mm²
-       - Unidade deve ser "m" (metros)
+    3. **CORRESPONDÊNCIA EXATA:**
+       - Para cada material, busque correspondência EXATA pelo nome/descrição
+       - Seja FLEXÍVEL com pequenas variações de texto
     
-    SEU OBJETIVO: Encontrar APENAS as divergências entre os dois documentos.
+    SEU OBJETIVO: Encontrar APENAS as DIVERGÊNCIAS entre os dois documentos.
     
     DADOS PARA ANÁLISE:
     
@@ -264,108 +258,104 @@ class SmartComparator {
     
     INSTRUÇÕES DETALHADAS:
     
-    1. **NA LISTA DE MATERIAIS:** 
-       - Combine "DESCRIÇÃO (F)" + "NOME DO ITEM (G)" para formar o nome completo
-       - IDENTIFIQUE cabos pela BITOLA (ex: 1.5mm², 2.5mm², 16mm², etc.)
-       - SOME quantidades de cabos da MESMA BITOLA, independente da cor
+    1. **ANÁLISE DE CABOS UNIPOLARES:**
+       - Identifique cada bitola separadamente (1.5mm², 2.5mm², 4mm², 16mm²)
+       - Some APENAS os cabos da MESMA BITOLA
+       - NÃO some bitolas diferentes
     
-    2. **NO ORÇAMENTO:** 
-       - Use "DESCRIÇÃO (D)" como referência
-       - Procure por termos genéricos de cabos + bitolas
+    2. **BUSCA NO ORÇAMENTO:**
+       - Para cabos unipolares: procure por "CABO DE COBRE FLEXÍVEL ISOLADO" + bitola
+       - Para cabos multipolares: procure pela descrição exata
+       - Compare quantidades totais por bitola
     
-    3. **ENCONTRE CORRESPONDÊNCIAS:** 
-       - Compare o TOTAL AGRUPADO por bitola da Lista com o valor do Orçamento
-       - Seja FLEXÍVEL com nomenclaturas diferentes
+    3. **CRITÉRIOS DE INCLUSÃO:**
+       - INCLUA APENAS itens com: Quantidades DIFERENTES, FALTANTES ou EXTRAS
+       - EXCLUA itens com quantidades IGUAIS
+       - EXCLUA cabos com diferença 0.0
     
-    4. **COMPARE:** Quantidades totais por bitola
+    4. **FORMATO OBRIGATÓRIO:**
     
-    5. **INCLUA APENAS ITENS COM DIVERGÊNCIA:**
-       - 🔴 Quantidades DIFERENTES para o mesmo material/bitola
-       - 🟡 Materiais/Bitolas na Lista mas NÃO no Orçamento (FALTANDO)
-       - 🔵 Materiais/Bitolas no Orçamento mas NÃO na Lista (EXTRAS)
+    🚨 DIVERGÊNCIAS ENCONTRADAS:
     
-    6. **EXCLUA ITENS SEM DIVERGÊNCIA:**
-       - ❌ NÃO inclua materiais que estão IGUAIS nos dois documentos
-       - ❌ NÃO inclua cabos com quantidades totais iguais
+    🔌 CABOS UNIPOLARES:
     
-    FORMATO DE RESPOSTA (OBRIGATÓRIO):
-    
-    📊 RESUMO DAS DIVERGÊNCIAS ENCONTRADAS:
-    
-    🚨 CABOS COM DIVERGÊNCIAS:
-    
-    BITOLA: [Ex: 16 mm²]
-    TOTAL LISTA: [soma de todas as cores] m
+    BITOLA: [1.5 mm² / 2.5 mm² / 4 mm² / 16 mm²]
+    TOTAL LISTA: [soma CORRETA da bitola] m
     ORÇAMENTO: [quantidade] m
-    DIFERENÇA: [+/- valor da diferença]
+    DIFERENÇA: [+/- valor]
     STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
-    CORES ENCONTRADAS: [lista das cores com quantidades individuais]
+    CORES INDIVIDUAIS: [lista com cores e quantidades]
     
-    🚨 OUTROS MATERIAIS COM DIVERGÊNCIAS:
+    🔌 CABOS MULTICONDUCTORES:
     
-    ITEM: [Nome completo do material]
+    ITEM: [Nome completo]
     LISTA DE MATERIAIS: [quantidade] [unidade]
     ORÇAMENTO: [quantidade] [unidade]
-    DIFERENÇA: [+/- valor da diferença]
+    DIFERENÇA: [+/- valor]
     STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
     
-    📈 RESUMO ESTATÍSTICO:
-    - Total de divergências encontradas: [número]
-    - Cabos com problemas: [número]
-    - Materiais faltantes: [número]
-    - Materiais extras: [número]
-    - Diferenças de quantidade: [número]
+    ⚡ OUTROS MATERIAIS:
     
-    EXEMPLOS DE RESPOSTA:
+    ITEM: [Nome completo]
+    LISTA DE MATERIAIS: [quantidade] [unidade]
+    ORÇAMENTO: [quantidade] [unidade]
+    DIFERENÇA: [+/- valor]
+    STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
     
-    🚨 CABOS COM DIVERGÊNCIAS:
+    📊 RESUMO ESTATÍSTICO:
+    - Total de divergências: [número]
+    - Cabos unipolares problemáticos: [número]
+    - Cabos multipolares problemáticos: [número]
+    - Outros materiais problemáticos: [número]
+    
+    EXEMPLOS CORRETOS:
+    
+    🔌 CABOS UNIPOLARES:
     
     BITOLA: 2.5 mm²
-    TOTAL LISTA: 180.0 m
-    ORÇAMENTO: 150.0 m
-    DIFERENÇA: -30.0
+    TOTAL LISTA: 4705.05 m  (soma APENAS dos cabos 2.5mm²)
+    ORÇAMENTO: 4905.4 m
+    DIFERENÇA: +200.35
     STATUS: QUANTIDADE DIFERENTE
-    CORES ENCONTRADAS: Azul (60m), Vermelho (60m), Verde-amarelo (60m)
+    CORES INDIVIDUAIS: Amarelo (1666.9m), Azul claro (1123.04m), Branco (353.55m), Preto (267.82m), Verde-amarelo (1208.71m), Vermelho (285.4m)
     
-    BITOLA: 25 mm²
-    TOTAL LISTA: 75.0 m
+    BITOLA: 16 mm²
+    TOTAL LISTA: 245.5 m
     ORÇAMENTO: NÃO ENCONTRADO
-    DIFERENÇA: -75.0
+    DIFERENÇA: -245.5
     STATUS: FALTANDO NO ORÇAMENTO
-    CORES ENCONTRADAS: Preto (75m)
+    CORES INDIVIDUAIS: Azul (51.2m), Branco (51.2m), Preto (51.2m), Verde (51.2m), Vermelho (40.7m)
     
-    🚨 OUTROS MATERIAIS COM DIVERGÊNCIAS:
+    🔌 CABOS MULTICONDUCTORES:
     
-    ITEM: Luminária LED 20W
-    LISTA DE MATERIAIS: 25 un
+    ITEM: CABO ISOLADO PP 3 X 1,5 MM2
+    LISTA DE MATERIAIS: 322.7 m
+    ORÇAMENTO: 322.7 m
+    DIFERENÇA: 0.0
+    STATUS: QUANTIDADE IGUAL → NÃO INCLUIR
+    
+    ITEM: CABO ISOLADO PP 3 X 1,5 MM2
+    LISTA DE MATERIAIS: 322.7 m
     ORÇAMENTO: NÃO ENCONTRADO
-    DIFERENÇA: -25
+    DIFERENÇA: -322.7
     STATUS: FALTANDO NO ORÇAMENTO
-    
-    ITEM: Parafuso Sextavado
-    LISTA DE MATERIAIS: NÃO ENCONTRADO
-    ORÇAMENTO: 100 un
-    DIFERENÇA: +100
-    STATUS: EXTRA NO ORÇAMENTO
-    
-    📈 RESUMO ESTATÍSTICO:
-    - Total de divergências encontradas: 4
-    - Cabos com problemas: 2
-    - Materiais faltantes: 2
-    - Materiais extras: 1
-    - Diferenças de quantidade: 1
     
     REGRAS FINAIS CRÍTICAS:
-    1. Para CABOS: Agrupe por bitola, some quantidades, ignore cores
-    2. Para OUTROS MATERIAIS: Mantenha análise individual
-    3. Converta "pç" para "un" nas unidades
-    4. Seja FLEXÍVEL com nomenclaturas diferentes
-    5. Calcule TODAS as diferenças numéricas
-    6. INCLUA APENAS itens com divergência
-    7. EXCLUA itens que estão iguais nos dois documentos
-    8. Mantenha este formato exato
     
-    COMEÇE A ANÁLISE DETALHADA E MOSTRE APENAS AS DIVERGÊNCIAS:`;
+    1. **SOMA CORRETA**: Some APENAS cabos da MESMA BITOLA
+    2. **BITOLAS SEPARADAS**: 1.5mm², 2.5mm², 4mm², 16mm² são BITOLAS DIFERENTES
+    3. **APENAS DIVERGÊNCIAS**: Exclua itens com quantidades iguais
+    4. **CORRESPONDÊNCIA PRECISA**: Busque nomes similares nos dois documentos
+    5. **CONVERSAO UNIDADE**: "pç" → "un"
+    6. **FORMATO EXATO**: Mantenha a estrutura especificada
+    
+    VERIFIQUE:
+    - Cabos 2.5mm²: Some APENAS linhas com "2.5 mm²"
+    - Cabos 4mm²: Some APENAS linhas com "4 mm²" 
+    - Cabos 1.5mm²: Procure correspondência multipolar
+    - Exclua itens com diferença 0.0
+    
+    COMEÇE A ANÁLISE DETALHADA E MOSTRE APENAS DIVERGÊNCIAS:`;
     }
 
     displayPrompt(prompt) {
