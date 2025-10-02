@@ -10,22 +10,22 @@
     <div class="container">
         <header class="app-header">
             <h1>🔍 Analisador com ChatGPT</h1>
-            <p>Envie os arquivos e o ChatGPT analisará TODAS as divergências</p>
+            <p>Envie os arquivos Excel e o ChatGPT analisará TODAS as divergências</p>
         </header>
 
         <div class="upload-section">
             <div class="upload-box">
-                <h3>📄 Lista de Materiais (PDF)</h3>
-                <input type="file" id="pdfFile" accept=".pdf" class="file-input">
-                <div class="file-preview" id="pdfPreview">
+                <h3>📋 Lista de Materiais (Excel)</h3>
+                <input type="file" id="materialsFile" accept=".xlsx,.xls" class="file-input">
+                <div class="file-preview" id="materialsPreview">
                     <p>Nenhum arquivo selecionado</p>
                 </div>
             </div>
             
             <div class="upload-box">
-                <h3>📊 Orçamento (Excel)</h3>
-                <input type="file" id="excelFile" accept=".xlsx,.xls" class="file-input">
-                <div class="file-preview" id="excelPreview">
+                <h3>📊 Orçamento Sintético (Excel)</h3>
+                <input type="file" id="budgetFile" accept=".xlsx,.xls" class="file-input">
+                <div class="file-preview" id="budgetPreview">
                     <p>Nenhum arquivo selecionado</p>
                 </div>
             </div>
@@ -40,7 +40,6 @@
         <div class="results-section" id="resultsSection" style="display: none;">
             <!-- Prompt do ChatGPT será mostrado aqui -->
         </div>
-        <!-- Adicione esta seção DEPOIS da resultsSection no seu index.html -->
 
         <div class="response-section" id="responseSection" style="display: none;">
             <h3>📋 COLE A RESPOSTA DO CHATGPT AQUI</h3>
@@ -81,11 +80,6 @@
 
     <!-- BIBLIOTECAS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-    </script>
-    
     <script src="script.js"></script>
 </body>
 </html>
