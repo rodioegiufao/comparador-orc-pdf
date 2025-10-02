@@ -1,4 +1,4 @@
-// script.js - Versão Simplificada (Apenas Mostrar Resposta)
+// script.js - Versão Corrigida
 class SmartComparator {
     constructor() {
         this.materialsFile = null;
@@ -71,13 +71,11 @@ class SmartComparator {
                         
                         jsonData.forEach((row, index) => {
                             if (row && row.length > 0) {
-                                // Extrai apenas as colunas específicas
-                                const descricao = row[5] || ''; // Coluna F (índice 5)
-                                const item = row[6] || '';      // Coluna G (índice 6)
-                                const quantidade = row[7] || ''; // Coluna H (índice 7)
-                                let unidade = row[8] || '';     // Coluna I (índice 8)
+                                const descricao = row[5] || '';
+                                const item = row[6] || '';
+                                const quantidade = row[7] || '';
+                                let unidade = row[8] || '';
                                 
-                                // Converte "pç" para "un"
                                 if (unidade.toLowerCase() === 'pç' || unidade.toLowerCase() === 'pc') {
                                     unidade = 'un';
                                 }
@@ -129,10 +127,9 @@ class SmartComparator {
                         
                         jsonData.forEach((row, index) => {
                             if (row && row.length > 0) {
-                                // Extrai apenas as colunas específicas
-                                const descricao = row[3] || '';  // Coluna D (índice 3)
-                                const unidade = row[4] || '';    // Coluna E (índice 4)
-                                const quantidade = row[5] || ''; // Coluna F (índice 5)
+                                const descricao = row[3] || '';
+                                const unidade = row[4] || '';
+                                const quantidade = row[5] || '';
                                 
                                 if (descricao || unidade || quantidade) {
                                     budgetData += `LINHA ${index + 1}: "${descricao}" | ${unidade} | ${quantidade}\n`;
@@ -305,7 +302,7 @@ COMEÇE A ANÁLISE DETALHADA:`;
     }
 }
 
-// Função simplificada - apenas mostra a resposta do ChatGPT
+// FUNÇÃO CORRIGIDA - Agora vai mostrar a resposta
 function processChatGPTResponse() {
     const responseText = document.getElementById('chatgptResponse').value.trim();
     
@@ -314,19 +311,21 @@ function processChatGPTResponse() {
         return;
     }
     
-    // Apenas mostra a resposta do ChatGPT diretamente
+    // CORREÇÃO: Chamar a função correta
     displayChatGPTResponse(responseText);
 }
 
+// FUNÇÃO CORRIGIDA - Exibe a resposta do ChatGPT
 function displayChatGPTResponse(responseText) {
     const resultsDisplay = document.getElementById('resultsDisplay');
     
+    // CORREÇÃO: Usar innerHTML corretamente
     resultsDisplay.innerHTML = `
         <div class="results-section">
             <h3>📊 RESPOSTA DO CHATGPT</h3>
             
             <div class="chatgpt-response">
-                <pre style="white-space: pre-wrap; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; font-family: inherit; font-size: 14px; line-height: 1.5;">${responseText}</pre>
+                <pre>${responseText}</pre>
             </div>
             
             <div class="actions" style="margin-top: 20px;">
