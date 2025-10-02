@@ -171,15 +171,15 @@ class SmartComparator {
             return;
         }
     
-        const prompt = this.createChatGPTPrompt();
-        this.displayPrompt(prompt);
-    
         const apiKey = document.getElementById("apiKey").value.trim();
         if (!apiKey) {
             alert("⚠️ Digite sua API Key da OpenAI antes de continuar.");
             return;
         }
     
+        // Resto do código permanece igual...
+        const prompt = this.createChatGPTPrompt();
+        
         // Mostra loading
         document.getElementById("loading").style.display = "block";
     
@@ -191,7 +191,7 @@ class SmartComparator {
                     "Authorization": `Bearer ${apiKey}`
                 },
                 body: JSON.stringify({
-                    model: "gpt-4o-mini",   // pode trocar para gpt-4.1, gpt-4o, etc.
+                    model: "gpt-4o-mini",
                     messages: [
                         { role: "system", content: "Você é um assistente especializado em análise de divergências de planilhas." },
                         { role: "user", content: prompt }
@@ -208,7 +208,6 @@ class SmartComparator {
             }
     
             const resposta = data.choices[0].message.content;
-    
             displayChatGPTResponse(resposta);
     
         } catch (err) {
@@ -218,7 +217,6 @@ class SmartComparator {
             document.getElementById("loading").style.display = "none";
         }
     }
-
 
     createChatGPTPrompt() {
         return `ANÁLISE ESPECIALIZADA: LISTA DE MATERIAIS vs ORÇAMENTO SINTÉTICO
