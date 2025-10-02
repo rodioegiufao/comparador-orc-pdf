@@ -232,79 +232,103 @@ class SmartComparator {
     - Coluna E: UNIDADE
     - Coluna F: QUANTIDADE
     
-    🎯 ESTRATÉGIA DE ANÁLISE:
+    🎯 ESTRATÉGIA DE ANÁLISE INTELIGENTE:
     
-    1. **CABOS UNIPOLARES:**
-       - Identifique cabos que tenham "mm²" ou "mm2"
-       - Extraia a **BITOLA** (1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120 mm²)
-       - **Some TODAS as cores da mesma bitola** → gerar total consolidado
-       - Liste também os totais por cor como referência
-       - Compare esse total com o orçamento
+    1. **IDENTIFICAÇÃO DE CABOS UNIPOLARES:**
+       - Procure por padrões: "mm²", "mm2", "bitola" seguido de números
+       - Agrupe por BITOLA: 1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120 mm²
+       - Some TODOS os cabos da MESMA BITOLA, independente da cor
     
     2. **CORRESPONDÊNCIA FLEXÍVEL:**
-       - Cabos unipolares: só compare **bitolas**, ignorando cor
-       - Outros materiais: busque por similaridade de texto (sinônimos, maiúsculas/minúsculas, variações pequenas)
-       - Não classificar como "faltante" ou "extra" se a correspondência for clara
+       - Para cabos unipolares: Compare BITOLAS (ex: 2.5mm² da Lista = "CABO...2,5 MM²" do Orçamento)
+       - Para outros materiais: Busque por palavras-chave similares
+       - Seja FLEXÍVEL com diferenças de texto, mas RIGOROSO com quantidades
     
-    3. **TOLERÂNCIA:**
-       - Ignore diferenças **< 1 unidade** ou **< 0,1%**
-       - Só registre divergências significativas
+    3. **TOLERÂNCIA PARA PEQUENAS DIFERENÇAS:**
+       - Ignore diferenças menores que 1 unidade
+       - Considere "PRATICAMENTE IGUAL" quando diferença < 0.1%
     
-    🔍 ETAPAS DA ANÁLISE:
+    DADOS PARA ANÁLISE:
     
-    1. Identificar e somar cabos unipolares por bitola (com detalhamento por cor).
-    2. Encontrar correspondências no orçamento (bitola no caso de cabos).
-    3. Listar divergências **significativas**:
-       - Itens da lista que não existem no orçamento
-       - Itens do orçamento que não estão na lista
-       - Diferenças de quantidade relevantes
-    4. Excluir do relatório:
+    ${this.materialsData}
+    
+    ${this.budgetData}
+    
+    🔍 INSTRUÇÕES DE ANÁLISE:
+    
+    1. **PRIMEIRO: Identifique todos os cabos unipolares na Lista de Materiais**
+       - Agrupe por bitola
+       - Some as quantidades de cada bitola
+       - Registre as cores individuais encontradas
+    
+    2. **SEGUNDO: Encontre correspondências no Orçamento**
+       - Para cabos: procure por descrições com a mesma bitola
+       - Para outros materiais: busque por nomes similares
+    
+    3. **TERCEIRO: Identifique divergências SIGNIFICATIVAS**
+       - Materiais da Lista que NÃO estão no Orçamento
+       - Materiais do Orçamento que NÃO estão na Lista
+       - Quantidades com diferenças maiores que 1 unidade
+    
+    4. **QUARTO: Exclua correspondências boas**
        - Itens com quantidades iguais
-       - Diferenças pequenas (<1 unidade ou <0.1%)
-       - Itens corretamente correspondidos
+       - Pequenas diferenças (< 1 unidade ou < 0.1%)
     
     📋 FORMATO DE RESPOSTA:
     
     🚨 DIVERGÊNCIAS SIGNIFICATIVAS:
     
     🔌 CABOS COM PROBLEMAS:
+    
     BITOLA: [bitola] mm²
     TOTAL LISTA: [quantidade total] m
     ORÇAMENTO: [quantidade] m
     DIFERENÇA: [+/- diferença]
-    STATUS: [QUANTIDADE DIFERENTE / FALTANDO / EXTRA]
+    STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
     CORES ENCONTRADAS: [lista de cores com quantidades]
     
-    ⚡ MATERIAIS FALTANTES:
-    ITEM: [nome material da lista]
-    QTD LISTA: [quantidade] [unidade]
+    ⚡ MATERIAIS FALTANTES NO ORÇAMENTO:
     
-    ⚡ MATERIAIS EXTRAS:
-    ITEM: [nome material do orçamento]
-    QTD ORÇAMENTO: [quantidade] [unidade]
+    ITEM: [nome do material da Lista]
+    QUANTIDADE LISTA: [quantidade] [unidade]
+    OBSERVAÇÃO: Material presente apenas na Lista de Materiais
     
-    🔧 OUTRAS DIVERGÊNCIAS:
-    ITEM: [nome material]
-    LISTA: [quantidade] [unidade]
+    ⚡ MATERIAIS EXTRAS NO ORÇAMENTO:
+    
+    ITEM: [nome do material do Orçamento]
+    QUANTIDADE ORÇAMENTO: [quantidade] [unidade]
+    OBSERVAÇÃO: Material presente apenas no Orçamento
+    
+    🔧 OUTRAS DIVERGÊNCIAS SIGNIFICATIVAS:
+    
+    ITEM: [nome do material]
+    LISTA DE MATERIAIS: [quantidade] [unidade]
     ORÇAMENTO: [quantidade] [unidade]
-    DIFERENÇA: [+/- diferença]
+    DIFERENÇA: [+/- diferença significativa]
     STATUS: QUANTIDADE DIFERENTE
     
     📊 RESUMO:
-    - Materiais faltantes: [número]
-    - Materiais extras: [número]
-    - Divergências de quantidade: [número]
+    - Total de materiais faltantes: [número]
+    - Total de materiais extras: [número]
+    - Total de divergências de quantidade: [número]
     - Cabos com problemas: [número]
     
-    ✅ CORRESPONDÊNCIAS CONFIRMADAS (não listar divergência):
-    - "CABO ISOLADO PP 3 X 1,5 MM2" na Lista = "CABO ISOLADO PP 3 X 1,5 MM2 (COMPOSIÇÃO...)" no Orçamento
-    - Cabos unipolares [BITOLA] mm² na Lista = "CABO DE COBRE FLEXÍVEL ISOLADO, [BITOLA] MM²" no Orçamento
+    ✅ CORRESPONDÊNCIAS ESPECÍFICAS IDENTIFICADAS (para referência):
+    
+    - "CABO ISOLADO PP 3 X 1,5 MM2" na Lista = "CABO ISOLADO PP 3 X 1,5 MM2 (COMPOSIÇÃO REFERÊNCIA COD 070561 AGETOP CIVIL 05/2023)" no Orçamento
+    - Cabos unipolares [BITOLA] mm² na Lista = "CABO DE COBRE FLEXÍVEL ISOLADO, [BITOLA], ANTI-CHAMA 0,6/1,0 KV, PARA CIRCUITOS TERMINAIS - FORNECIMENTO E INSTALAÇÃO. AF_03/2023²" no Orçamento
+    -
+    
+    🚫 NÃO INCLUIR NA RESPOSTA:
+    - Itens com quantidades iguais
+    - Diferenças menores que 1 unidade
+    - Pequenas variações de arredondamento (< 0.1%)
+    - Itens que estão corretos nos dois documentos
     
     🎯 FOCO PRINCIPAL:
-    Apresentar apenas os problemas REAIS que exigem atenção.
-    Não registrar duplicações falsas de cabos entre lista e orçamento.
-    Sempre somar corretamente os cabos unipolares.
-    `;
+    Encontrar APENAS os problemas reais que precisam de atenção!
+    
+    COMEÇE A ANÁLISE DETALHADA:`;
     }
 
     displayPrompt(prompt) {
