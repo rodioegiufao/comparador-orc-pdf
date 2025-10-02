@@ -1,4 +1,4 @@
-// script.js - Versão Corrigida para Comparar Dois Excel
+// script.js - Versão Atualizada com Extração Específica
 class SmartComparator {
     constructor() {
         this.materialsFile = null;
@@ -32,12 +32,12 @@ class SmartComparator {
         try {
             if (type === 'materials') {
                 this.materialsFile = file;
-                this.materialsData = await this.extractExcelData(file, 'LISTA DE MATERIAIS');
+                this.materialsData = await this.extractMaterialsData(file);
                 previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - Lista carregada</small>';
                 console.log('Lista de materiais carregada com sucesso');
             } else {
                 this.budgetFile = file;
-                this.budgetData = await this.extractExcelData(file, 'ORÇAMENTO');
+                this.budgetData = await this.extractBudgetData(file);
                 previewElement.innerHTML = '<p><strong>' + file.name + '</strong> ✅</p><small>' + (file.size / 1024).toFixed(1) + ' KB - Orçamento carregado</small>';
                 console.log('Orçamento carregado com sucesso');
             }
@@ -49,8 +49,8 @@ class SmartComparator {
         }
     }
 
-    async extractExcelData(file, type) {
-        console.log('Extraindo dados do Excel (' + type + ')...');
+    async extractMaterialsData(file) {
+        console.log('Extraindo dados da LISTA DE MATERIAIS...');
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             
@@ -59,33 +59,93 @@ class SmartComparator {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    let excelData = '';
+                    let materialsData = '=== LISTA DE MATERIAIS ===\n';
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
                         
-                        excelData += `=== ${type} - PLANILHA: ${sheetName} ===\n`;
+                        materialsData += `PLANILHA: ${sheetName}\n`;
+                        materialsData += 'LINHA | DESCRIÇÃO (F) | ITEM (G) | QUANTIDADE (H) | UNIDADE (I)\n';
+                        materialsData += '----------------------------------------------------------------\n';
                         
                         jsonData.forEach((row, index) => {
                             if (row && row.length > 0) {
-                                // Extrai todas as colunas para análise
-                                let rowText = `LINHA ${index + 1}: `;
-                                row.forEach((cell, cellIndex) => {
-                                    if (cell !== '' && cell !== null && cell !== undefined) {
-                                        rowText += `[Col ${cellIndex + 1}] "${cell}" | `;
-                                    }
-                                });
-                                excelData += rowText + '\n';
+                                // Extrai apenas as colunas específicas
+                                const descricao = row[5] || ''; // Coluna F (índice 5)
+                                const item = row[6] || '';      // Coluna G (índice 6)
+                                const quantidade = row[7] || ''; // Coluna H (índice 7)
+                                let unidade = row[8] || '';     // Coluna I (índice 8)
+                                
+                                // Converte "pç" para "un"
+                                if (unidade.toLowerCase() === 'pç' || unidade.toLowerCase() === 'pc') {
+                                    unidade = 'un';
+                                }
+                                
+                                if (descricao || item || quantidade || unidade) {
+                                    materialsData += `LINHA ${index + 1}: "${descricao}" | "${item}" | ${quantidade} | ${unidade}\n`;
+                                }
                             }
                         });
-                        excelData += '\n';
+                        materialsData += '\n';
                     });
                     
-                    console.log(type + ' extraído:', excelData.length, 'caracteres');
-                    resolve(excelData);
+                    console.log('Lista de materiais extraída:', materialsData.length, 'caracteres');
+                    resolve(materialsData);
                 } catch (error) {
-                    console.error('Erro na extração Excel:', error);
+                    console.error('Erro na extração da lista de materiais:', error);
+                    reject(error);
+                }
+            };
+            
+            reader.onerror = function(error) {
+                console.error('Erro no FileReader:', error);
+                reject(error);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    async extractBudgetData(file) {
+        console.log('Extraindo dados do ORÇAMENTO SINTÉTICO...');
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    let budgetData = '=== ORÇAMENTO SINTÉTICO ===\n';
+                    
+                    workbook.SheetNames.forEach(sheetName => {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+                        
+                        budgetData += `PLANILHA: ${sheetName}\n`;
+                        budgetData += 'LINHA | DESCRIÇÃO (D) | UNIDADE (E) | QUANTIDADE (F)\n';
+                        budgetData += '----------------------------------------------------\n';
+                        
+                        jsonData.forEach((row, index) => {
+                            if (row && row.length > 0) {
+                                // Extrai apenas as colunas específicas
+                                const descricao = row[3] || '';  // Coluna D (índice 3)
+                                const unidade = row[4] || '';    // Coluna E (índice 4)
+                                const quantidade = row[5] || ''; // Coluna F (índice 5)
+                                
+                                if (descricao || unidade || quantidade) {
+                                    budgetData += `LINHA ${index + 1}: "${descricao}" | ${unidade} | ${quantidade}\n`;
+                                }
+                            }
+                        });
+                        budgetData += '\n';
+                    });
+                    
+                    console.log('Orçamento extraído:', budgetData.length, 'caracteres');
+                    resolve(budgetData);
+                } catch (error) {
+                    console.error('Erro na extração do orçamento:', error);
                     reject(error);
                 }
             };
@@ -121,32 +181,37 @@ class SmartComparator {
     createChatGPTPrompt() {
         return `ANÁLISE ESPECIALIZADA: LISTA DE MATERIAIS vs ORÇAMENTO SINTÉTICO
 
-IMPORTANTE - AMBOS OS ARQUIVOS SÃO EXCEL:
-
 📋 LISTA DE MATERIAIS (Excel):
-- Estruturado em colunas
-- Contém todos os materiais necessários
+- Coluna F: DESCRIÇÃO do material
+- Coluna G: NOME DO ITEM
+- Coluna H: QUANTIDADE
+- Coluna I: UNIDADE (converta "pç" para "un")
 
 📊 ORÇAMENTO SINTÉTICO (Excel):
-- Estruturado em colunas  
-- Contém os materiais orçados
+- Coluna D: DESCRIÇÃO do material
+- Coluna E: UNIDADE
+- Coluna F: QUANTIDADE
+
+ESTRATÉGIA DE CORRESPONDÊNCIA:
+Para encontrar correspondências, você deve considerar que:
+- A "DESCRIÇÃO" + "NOME DO ITEM" da Lista de Materiais deve corresponder à "DESCRIÇÃO" do Orçamento
+- Exemplo: Se na Lista tiver "Cabo" + "Elétrico 2,5mm" e no Orçamento tiver "Cabo Elétrico 2,5mm", são o mesmo material
 
 SEU OBJETIVO: Encontrar TODAS as divergências entre os dois documentos.
 
 DADOS PARA ANÁLISE:
 
-=== LISTA DE MATERIAIS (EXCEL) ===
 ${this.materialsData}
 
-=== ORÇAMENTO SINTÉTICO (EXCEL) ===  
 ${this.budgetData}
 
 INSTRUÇÕES DETALHADAS:
 
-1. Analise AMBOS os arquivos Excel
-2. Encontre correspondências pelos nomes dos materiais
-3. Compare as quantidades e unidades
-4. IDENTIFIQUE:
+1. NA LISTA DE MATERIAIS: Combine "DESCRIÇÃO (F)" + "NOME DO ITEM (G)" para formar o nome completo do material
+2. NO ORÇAMENTO: Use "DESCRIÇÃO (D)" como referência
+3. ENCONTRE CORRESPONDÊNCIAS: Compare os nomes completos dos materiais (seja flexível com pequenas diferenças)
+4. COMPARE: Quantidades e unidades
+5. IDENTIFIQUE:
    - 🔴 Quantidades DIFERENTES para o mesmo material
    - 🟡 Materiais na Lista mas NÃO no Orçamento (FALTANDO)
    - 🔵 Materiais no Orçamento mas NÃO na Lista (EXTRAS)
@@ -155,7 +220,7 @@ FORMATO DE RESPOSTA (OBRIGATÓRIO):
 
 Para CADA divergência encontrada:
 
-ITEM: [Nome do material]
+ITEM: [Nome completo do material - combinação Descrição + Item quando aplicável]
 LISTA DE MATERIAIS: [quantidade] [unidade]
 ORÇAMENTO: [quantidade] [unidade]
 DIFERENÇA: [+/- valor da diferença]
@@ -163,32 +228,34 @@ STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
 
 EXEMPLOS:
 
-ITEM: CABO ELÉTRICO 2,5mm
+ITEM: Cabo Elétrico 2,5mm
 LISTA DE MATERIAIS: 150 m
 ORÇAMENTO: 120 m
 DIFERENÇA: -30
 STATUS: QUANTIDADE DIFERENTE
 
-ITEM: LUMINÁRIA LED
+ITEM: Luminária LED 20W
 LISTA DE MATERIAIS: 25 un
 ORÇAMENTO: NÃO ENCONTRADO
 DIFERENÇA: -25
 STATUS: FALTANDO NO ORÇAMENTO
 
-ITEM: PARAFUSO SExtra
+ITEM: Parafuso Sextavado
 LISTA DE MATERIAIS: NÃO ENCONTRADO
 ORÇAMENTO: 100 un
 DIFERENÇA: +100
 STATUS: EXTRA NO ORÇAMENTO
 
-REGRAS:
-- Seja METICULOSO na busca por correspondências
-- Calcule as diferenças numéricas
-- Inclua TODOS os itens com divergência
-- Mantenha este formato exato
-- Ignore itens que estão iguais nos dois documentos
+REGRAS CRÍTICAS:
+1. Combine "Descrição + Item" da Lista para comparar com "Descrição" do Orçamento
+2. Converta "pç" para "un" nas unidades
+3. Seja FLEXÍVEL com pequenas diferenças nos nomes (abreviações, maiúsculas, etc.)
+4. Calcule TODAS as diferenças numéricas
+5. Inclua TODOS os itens com divergência
+6. Mantenha este formato exato
+7. Ignore itens que estão iguais nos dois documentos
 
-COMEÇE A ANÁLISE:`;
+COMEÇE A ANÁLISE DETALHADA:`;
     }
 
     displayPrompt(prompt) {
@@ -209,12 +276,12 @@ COMEÇE A ANÁLISE:`;
                 </button>
                 
                 <div class="instructions">
-                    <h4>🎯 DICAS PARA ANÁLISE PRECISA:</h4>
+                    <h4>🎯 ESTRATÉGIA DE CORRESPONDÊNCIA:</h4>
                     <ul>
-                        <li><strong>Ambos os arquivos são Excel</strong> - muito mais fácil de analisar!</li>
-                        <li><strong>Foque</strong> em encontrar NOMES SIMILARES de materiais</li>
-                        <li><strong>Ignore</strong> pequenas diferenças de escrita nos nomes</li>
-                        <li><strong>Compare</strong> quantidades e unidades para cada material</li>
+                        <li><strong>Lista de Materiais:</strong> Combine "Descrição (F)" + "Item (G)"</li>
+                        <li><strong>Orçamento:</strong> Use apenas "Descrição (D)"</li>
+                        <li><strong>Unidades:</strong> "pç" é automaticamente convertido para "un"</li>
+                        <li><strong>Seja flexível</strong> com pequenas diferenças nos nomes dos materiais</li>
                     </ul>
                 </div>
             </div>
@@ -238,6 +305,7 @@ COMEÇE A ANÁLISE:`;
     }
 }
 
+// [MANTENHA AS FUNÇÕES processChatGPTResponse, displayProcessedResults, etc QUE JÁ EXISTIAM]
 // Funções para processar a resposta do ChatGPT
 function processChatGPTResponse() {
     const responseText = document.getElementById('chatgptResponse').value.trim();
