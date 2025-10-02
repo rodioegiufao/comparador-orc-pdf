@@ -254,7 +254,7 @@ class SmartComparator {
        - Combine com bitolas: "1.5", "2.5", "4", "6", "10", "16", "25", "35", "50", "70", "95", "120", "150", "185", "240" mm²
        - Unidade deve ser "m" (metros)
     
-    SEU OBJETIVO: Encontrar TODAS as divergências entre os dois documentos, AGRUPANDO CABOS POR BITOLA.
+    SEU OBJETIVO: Encontrar APENAS as divergências entre os dois documentos.
     
     DADOS PARA ANÁLISE:
     
@@ -279,14 +279,20 @@ class SmartComparator {
     
     4. **COMPARE:** Quantidades totais por bitola
     
-    5. **IDENTIFIQUE:**
-       - 🔴 Quantidades DIFERENTES para a mesma bitola
-       - 🟡 Bitolas na Lista mas NÃO no Orçamento (FALTANDO)
-       - 🔵 Bitolas no Orçamento mas NÃO na Lista (EXTRAS)
+    5. **INCLUA APENAS ITENS COM DIVERGÊNCIA:**
+       - 🔴 Quantidades DIFERENTES para o mesmo material/bitola
+       - 🟡 Materiais/Bitolas na Lista mas NÃO no Orçamento (FALTANDO)
+       - 🔵 Materiais/Bitolas no Orçamento mas NÃO na Lista (EXTRAS)
+    
+    6. **EXCLUA ITENS SEM DIVERGÊNCIA:**
+       - ❌ NÃO inclua materiais que estão IGUAIS nos dois documentos
+       - ❌ NÃO inclua cabos com quantidades totais iguais
     
     FORMATO DE RESPOSTA (OBRIGATÓRIO):
     
-    Para CABOS (AGRUPADOS POR BITOLA):
+    📊 RESUMO DAS DIVERGÊNCIAS ENCONTRADAS:
+    
+    🚨 CABOS COM DIVERGÊNCIAS:
     
     BITOLA: [Ex: 16 mm²]
     TOTAL LISTA: [soma de todas as cores] m
@@ -295,7 +301,7 @@ class SmartComparator {
     STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
     CORES ENCONTRADAS: [lista das cores com quantidades individuais]
     
-    Para OUTROS MATERIAIS (não cabos):
+    🚨 OUTROS MATERIAIS COM DIVERGÊNCIAS:
     
     ITEM: [Nome completo do material]
     LISTA DE MATERIAIS: [quantidade] [unidade]
@@ -303,14 +309,16 @@ class SmartComparator {
     DIFERENÇA: [+/- valor da diferença]
     STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
     
-    EXEMPLOS DE CABOS AGRUPADOS:
+    📈 RESUMO ESTATÍSTICO:
+    - Total de divergências encontradas: [número]
+    - Cabos com problemas: [número]
+    - Materiais faltantes: [número]
+    - Materiais extras: [número]
+    - Diferenças de quantidade: [número]
     
-    BITOLA: 16 mm²
-    TOTAL LISTA: 245.5 m
-    ORÇAMENTO: 245.5 m
-    DIFERENÇA: 0
-    STATUS: QUANTIDADE DIFERENTE
-    CORES ENCONTRADAS: Azul claro (51.2m), Branco (51.2m), Preto (51.2m), Verde-amarelo (51.2m), Vermelho (40.7m)
+    EXEMPLOS DE RESPOSTA:
+    
+    🚨 CABOS COM DIVERGÊNCIAS:
     
     BITOLA: 2.5 mm²
     TOTAL LISTA: 180.0 m
@@ -326,7 +334,7 @@ class SmartComparator {
     STATUS: FALTANDO NO ORÇAMENTO
     CORES ENCONTRADAS: Preto (75m)
     
-    EXEMPLOS DE OUTROS MATERIAIS:
+    🚨 OUTROS MATERIAIS COM DIVERGÊNCIAS:
     
     ITEM: Luminária LED 20W
     LISTA DE MATERIAIS: 25 un
@@ -340,19 +348,24 @@ class SmartComparator {
     DIFERENÇA: +100
     STATUS: EXTRA NO ORÇAMENTO
     
-    REGRAS FINAIS:
+    📈 RESUMO ESTATÍSTICO:
+    - Total de divergências encontradas: 4
+    - Cabos com problemas: 2
+    - Materiais faltantes: 2
+    - Materiais extras: 1
+    - Diferenças de quantidade: 1
+    
+    REGRAS FINAIS CRÍTICAS:
     1. Para CABOS: Agrupe por bitola, some quantidades, ignore cores
     2. Para OUTROS MATERIAIS: Mantenha análise individual
     3. Converta "pç" para "un" nas unidades
     4. Seja FLEXÍVEL com nomenclaturas diferentes
     5. Calcule TODAS as diferenças numéricas
-    6. Inclua TODOS os itens com divergência
-    7. Mantenha este formato exato
-    8. Ignore itens que estão iguais nos dois documentos
+    6. INCLUA APENAS itens com divergência
+    7. EXCLUA itens que estão iguais nos dois documentos
+    8. Mantenha este formato exato
     
-    IDENTIFIQUE PRIMEIRO TODOS OS CABOS POR BITOLA, DEPOIS ANALISE OS DEMAIS MATERIAIS:
-    
-    COMEÇE A ANÁLISE DETALHADA:`;
+    COMEÇE A ANÁLISE DETALHADA E MOSTRE APENAS AS DIVERGÊNCIAS:`;
     }
 
     displayPrompt(prompt) {
