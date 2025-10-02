@@ -1,4 +1,4 @@
-// script.js - Versão Atualizada com Extração Específica
+// script.js - Versão Simplificada (Apenas Mostrar Resposta)
 class SmartComparator {
     constructor() {
         this.materialsFile = null;
@@ -305,8 +305,7 @@ COMEÇE A ANÁLISE DETALHADA:`;
     }
 }
 
-// [MANTENHA AS FUNÇÕES processChatGPTResponse, displayProcessedResults, etc QUE JÁ EXISTIAM]
-// Funções para processar a resposta do ChatGPT
+// Função simplificada - apenas mostra a resposta do ChatGPT
 function processChatGPTResponse() {
     const responseText = document.getElementById('chatgptResponse').value.trim();
     
@@ -315,79 +314,24 @@ function processChatGPTResponse() {
         return;
     }
     
-    displayProcessedResults(responseText);
+    // Apenas mostra a resposta do ChatGPT diretamente
+    displayChatGPTResponse(responseText);
 }
 
-function displayProcessedResults(responseText) {
+function displayChatGPTResponse(responseText) {
     const resultsDisplay = document.getElementById('resultsDisplay');
-    
-    // Extrair informações da resposta
-    const items = extractItemsFromResponse(responseText);
     
     resultsDisplay.innerHTML = `
         <div class="results-section">
-            <h3>📊 RESULTADOS DA ANÁLISE</h3>
+            <h3>📊 RESPOSTA DO CHATGPT</h3>
             
-            ${items.length > 0 ? `
-                <div class="summary-cards">
-                    <div class="card total">
-                        <h3>TOTAL DIVERGÊNCIAS</h3>
-                        <div class="number">${items.length}</div>
-                    </div>
-                    <div class="card mismatch">
-                        <h3>QUANT. DIFERENTES</h3>
-                        <div class="number">${items.filter(item => item.status.includes('QUANTIDADE')).length}</div>
-                    </div>
-                    <div class="card missing">
-                        <h3>FALTANTES</h3>
-                        <div class="number">${items.filter(item => item.status.includes('FALTANDO')).length}</div>
-                    </div>
-                    <div class="card extra">
-                        <h3>EXTRAS</h3>
-                        <div class="number">${items.filter(item => item.status.includes('EXTRA')).length}</div>
-                    </div>
-                </div>
-                
-                <div class="analysis-info">
-                    <h3>📋 DETALHES DAS DIVERGÊNCIAS</h3>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th>Lista de Materiais</th>
-                                    <th>Orçamento</th>
-                                    <th>Diferença</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${items.map(item => `
-                                    <tr>
-                                        <td><strong>${item.item}</strong></td>
-                                        <td>${item.lista}</td>
-                                        <td>${item.orçamento}</td>
-                                        <td class="${item.diferenca?.includes('+') ? 'difference-positive' : 'difference-negative'}">${item.diferenca}</td>
-                                        <td class="status-${getStatusClass(item.status)}">${item.status}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            ` : `
-                <div class="analysis-info" style="background: #d4edda; border-left: 4px solid #28a745;">
-                    <h3 style="color: #155724;">✅ NENHUMA DIVERGÊNCIA ENCONTRADA!</h3>
-                    <p>Lista de materiais e orçamento estão compatíveis.</p>
-                </div>
-            `}
+            <div class="chatgpt-response">
+                <pre style="white-space: pre-wrap; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; font-family: inherit; font-size: 14px; line-height: 1.5;">${responseText}</pre>
+            </div>
             
-            <div class="actions">
-                <button onclick="exportToExcel()" class="export-btn">
-                    📊 Exportar para Excel
-                </button>
+            <div class="actions" style="margin-top: 20px;">
                 <button onclick="copyResults()" class="export-btn" style="background: #3498db;">
-                    📋 Copiar Resultados
+                    📋 Copiar Resposta
                 </button>
             </div>
         </div>
@@ -397,43 +341,6 @@ function displayProcessedResults(responseText) {
     resultsDisplay.scrollIntoView({ behavior: 'smooth' });
 }
 
-function extractItemsFromResponse(text) {
-    const items = [];
-    const lines = text.split('\n');
-    let currentItem = {};
-    
-    lines.forEach(line => {
-        line = line.trim();
-        
-        if (line.startsWith('ITEM:')) {
-            if (currentItem.item) items.push(currentItem);
-            currentItem = { item: line.replace('ITEM:', '').trim() };
-        }
-        else if (line.startsWith('LISTA DE MATERIAIS:')) {
-            currentItem.lista = line.replace('LISTA DE MATERIAIS:', '').trim();
-        }
-        else if (line.startsWith('ORÇAMENTO:')) {
-            currentItem.orçamento = line.replace('ORÇAMENTO:', '').trim();
-        }
-        else if (line.startsWith('DIFERENÇA:')) {
-            currentItem.diferenca = line.replace('DIFERENÇA:', '').trim();
-        }
-        else if (line.startsWith('STATUS:')) {
-            currentItem.status = line.replace('STATUS:', '').trim();
-        }
-    });
-    
-    if (currentItem.item) items.push(currentItem);
-    return items;
-}
-
-function getStatusClass(status) {
-    if (status.includes('QUANTIDADE DIFERENTE')) return 'mismatch';
-    if (status.includes('FALTANDO')) return 'missing';
-    if (status.includes('EXTRA')) return 'extra';
-    return 'missing';
-}
-
 function clearResponse() {
     document.getElementById('chatgptResponse').value = '';
 }
@@ -441,12 +348,8 @@ function clearResponse() {
 function copyResults() {
     const responseText = document.getElementById('chatgptResponse').value;
     navigator.clipboard.writeText(responseText).then(() => {
-        alert('✅ Resultados copiados!');
+        alert('✅ Resposta copiada!');
     });
-}
-
-function exportToExcel() {
-    alert('📊 Exportação para Excel será implementada em breve!');
 }
 
 // Inicialização
