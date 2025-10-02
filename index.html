@@ -16,6 +16,7 @@
         <div class="upload-section">
             <div class="upload-box">
                 <h3>📋 Lista de Materiais (Excel)</h3>
+                <p class="file-info">Extrai: Descrição (F), Item (G), Quantidade (H), Unidade (I)</p>
                 <input type="file" id="materialsFile" accept=".xlsx,.xls" class="file-input">
                 <div class="file-preview" id="materialsPreview">
                     <p>Nenhum arquivo selecionado</p>
@@ -24,6 +25,7 @@
             
             <div class="upload-box">
                 <h3>📊 Orçamento Sintético (Excel)</h3>
+                <p class="file-info">Extrai: Descrição (D), Unidade (E), Quantidade (F)</p>
                 <input type="file" id="budgetFile" accept=".xlsx,.xls" class="file-input">
                 <div class="file-preview" id="budgetPreview">
                     <p>Nenhum arquivo selecionado</p>
@@ -52,7 +54,7 @@
             
             <div class="response-buttons">
                 <button onclick="processChatGPTResponse()" class="process-btn">
-                    ✅ Processar Resposta do ChatGPT
+                    ✅ Mostrar Resposta do ChatGPT
                 </button>
                 <button onclick="clearResponse()" class="copy-btn" style="background: #95a5a6;">
                     🗑️ Limpar
@@ -64,14 +66,15 @@
                 <ol>
                     <li>Cole o prompt no ChatGPT-4 e aguarde a análise completa</li>
                     <li>Copie toda a resposta do ChatGPT e cole no campo acima</li>
-                    <li>Clique em "Processar Resposta" para ver os resultados organizados</li>
+                    <li>Clique em "Mostrar Resposta" para ver o resultado</li>
                 </ol>
             </div>
         </div>
         
         <div class="results-display" id="resultsDisplay" style="display: none;">
-            <!-- Aqui serão mostrados os resultados processados -->
+            <!-- Aqui será mostrada apenas a resposta do ChatGPT -->
         </div>
+        
         <div class="loading" id="loading" style="display: none;">
             <div class="spinner"></div>
             <p>Preparando análise...</p>
