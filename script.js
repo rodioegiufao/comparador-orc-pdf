@@ -163,17 +163,62 @@ class SmartComparator {
         btn.disabled = !isReady;
     }
 
-    prepareForChatGPT() {
+    async prepareForChatGPT() {
         console.log('Preparando prompt para ChatGPT...');
-        
+    
         if (!this.materialsFile || !this.budgetFile) {
             alert('❌ Por favor, carregue ambos os arquivos Excel primeiro.');
             return;
         }
-
+    
         const prompt = this.createChatGPTPrompt();
         this.displayPrompt(prompt);
+    
+        const apiKey = document.getElementById("apiKey").value.trim();
+        if (!apiKey) {
+            alert("⚠️ Digite sua API Key da OpenAI antes de continuar.");
+            return;
+        }
+    
+        // Mostra loading
+        document.getElementById("loading").style.display = "block";
+    
+        try {
+            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini",   // pode trocar para gpt-4.1, gpt-4o, etc.
+                    messages: [
+                        { role: "system", content: "Você é um assistente especializado em análise de divergências de planilhas." },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0
+                })
+            });
+    
+            const data = await response.json();
+            console.log("Resposta da OpenAI:", data);
+    
+            if (data.error) {
+                throw new Error(data.error.message);
+            }
+    
+            const resposta = data.choices[0].message.content;
+    
+            displayChatGPTResponse(resposta);
+    
+        } catch (err) {
+            alert("❌ Erro ao consultar OpenAI: " + err.message);
+            console.error(err);
+        } finally {
+            document.getElementById("loading").style.display = "none";
+        }
     }
+
 
     createChatGPTPrompt() {
         return `ANÁLISE ESPECIALIZADA: LISTA DE MATERIAIS vs ORÇAMENTO SINTÉTICO
