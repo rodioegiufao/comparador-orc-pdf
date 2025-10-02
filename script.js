@@ -220,82 +220,139 @@ class SmartComparator {
 
     createChatGPTPrompt() {
         return `ANÁLISE ESPECIALIZADA: LISTA DE MATERIAIS vs ORÇAMENTO SINTÉTICO
-
-📋 LISTA DE MATERIAIS (Excel):
-- Coluna F: DESCRIÇÃO do material
-- Coluna G: NOME DO ITEM
-- Coluna H: QUANTIDADE
-- Coluna I: UNIDADE (converta "pç" para "un")
-
-📊 ORÇAMENTO SINTÉTICO (Excel):
-- Coluna D: DESCRIÇÃO do material
-- Coluna E: UNIDADE
-- Coluna F: QUANTIDADE
-
-ESTRATÉGIA DE CORRESPONDÊNCIA:
-Para encontrar correspondências, você deve considerar que:
-- A "DESCRIÇÃO" + "NOME DO ITEM" da Lista de Materiais deve corresponder à "DESCRIÇÃO" do Orçamento
-- Exemplo: Se na Lista tiver "Cabo" + "Elétrico 2,5mm" e no Orçamento tiver "Cabo Elétrico 2,5mm", são o mesmo material
-
-SEU OBJETIVO: Encontrar TODAS as divergências entre os dois documentos.
-
-DADOS PARA ANÁLISE:
-
-${this.materialsData}
-
-${this.budgetData}
-
-INSTRUÇÕES DETALHADAS:
-
-1. NA LISTA DE MATERIAIS: Combine "DESCRIÇÃO (F)" + "NOME DO ITEM (G)" para formar o nome completo do material
-2. NO ORÇAMENTO: Use "DESCRIÇÃO (D)" como referência
-3. ENCONTRE CORRESPONDÊNCIAS: Compare os nomes completos dos materiais (seja flexível com pequenas diferenças)
-4. COMPARE: Quantidades e unidades
-5. IDENTIFIQUE:
-   - 🔴 Quantidades DIFERENTES para o mesmo material
-   - 🟡 Materiais na Lista mas NÃO no Orçamento (FALTANDO)
-   - 🔵 Materiais no Orçamento mas NÃO na Lista (EXTRAS)
-
-FORMATO DE RESPOSTA (OBRIGATÓRIO):
-
-Para CADA divergência encontrada:
-
-ITEM: [Nome completo do material - combinação Descrição + Item quando aplicável]
-LISTA DE MATERIAIS: [quantidade] [unidade]
-ORÇAMENTO: [quantidade] [unidade]
-DIFERENÇA: [+/- valor da diferença]
-STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
-
-EXEMPLOS:
-
-ITEM: Cabo Elétrico 2,5mm
-LISTA DE MATERIAIS: 150 m
-ORÇAMENTO: 120 m
-DIFERENÇA: -30
-STATUS: QUANTIDADE DIFERENTE
-
-ITEM: Luminária LED 20W
-LISTA DE MATERIAIS: 25 un
-ORÇAMENTO: NÃO ENCONTRADO
-DIFERENÇA: -25
-STATUS: FALTANDO NO ORÇAMENTO
-
-ITEM: Parafuso Sextavado
-LISTA DE MATERIAIS: NÃO ENCONTRADO
-ORÇAMENTO: 100 un
-DIFERENÇA: +100
-STATUS: EXTRA NO ORÇAMENTO
-
-REGRAS CRÍTICAS:
-1. Combine "Descrição + Item" da Lista para comparar com "Descrição" do Orçamento
-2. Converta "pç" para "un" nas unidades
-3. Seja FLEXÍVEL com pequenas diferenças nos nomes (abreviações, maiúsculas, etc.)
-4. Calcule TODAS as diferenças numéricas
-5. Inclua TODOS os itens com divergência
-6. Mantenha este formato exato
-7. Ignore itens que estão iguais nos dois documentos
-
-COMEÇE A ANÁLISE DETALHADA:`;
+    
+    📋 LISTA DE MATERIAIS (Excel):
+    - Coluna F: DESCRIÇÃO do material
+    - Coluna G: NOME DO ITEM
+    - Coluna H: QUANTIDADE
+    - Coluna I: UNIDADE (converta "pç" para "un")
+    
+    📊 ORÇAMENTO SINTÉTICO (Excel):
+    - Coluna D: DESCRIÇÃO do material
+    - Coluna E: UNIDADE
+    - Coluna F: QUANTIDADE
+    
+    ESTRATÉGIA DE CORRESPONDÊNCIA - REGRAS CRÍTICAS PARA CABOS:
+    
+    1. **AGRUPAMENTO DE CABOS POR BITOLA:**
+       - Quando encontrar cabos da MESMA BITOLA mas cores diferentes na Lista de Materiais, SOME as quantidades
+       - Exemplo: 
+         * Cabo 16mm² Azul: 51.2 m
+         * Cabo 16mm² Branco: 51.2 m  
+         * Cabo 16mm² Preto: 51.2 m
+         * Cabo 16mm² Verde: 51.2 m
+         * Cabo 16mm² Vermelho: 40.7 m
+         → TOTAL: 51.2 + 51.2 + 51.2 + 51.2 + 40.7 = 245.5 m
+    
+    2. **CORRESPONDÊNCIA COM ORÇAMENTO:**
+       - No Orçamento, procure por descrições como: "CABO", "16 MM²", "16mm²", "bitola 16"
+       - Ignore diferenças de cores, marcas e descrições detalhadas
+       - Foque na BITOLA e no TIPO DE CABO
+    
+    3. **PADRÕES DE BUSCA NO ORÇAMENTO:**
+       - Procure por: "CABO", "FIO", "CONDUTOR", "ELÉTRICO"
+       - Combine com bitolas: "1.5", "2.5", "4", "6", "10", "16", "25", "35", "50", "70", "95", "120", "150", "185", "240" mm²
+       - Unidade deve ser "m" (metros)
+    
+    SEU OBJETIVO: Encontrar TODAS as divergências entre os dois documentos, AGRUPANDO CABOS POR BITOLA.
+    
+    DADOS PARA ANÁLISE:
+    
+    ${this.materialsData}
+    
+    ${this.budgetData}
+    
+    INSTRUÇÕES DETALHADAS:
+    
+    1. **NA LISTA DE MATERIAIS:** 
+       - Combine "DESCRIÇÃO (F)" + "NOME DO ITEM (G)" para formar o nome completo
+       - IDENTIFIQUE cabos pela BITOLA (ex: 1.5mm², 2.5mm², 16mm², etc.)
+       - SOME quantidades de cabos da MESMA BITOLA, independente da cor
+    
+    2. **NO ORÇAMENTO:** 
+       - Use "DESCRIÇÃO (D)" como referência
+       - Procure por termos genéricos de cabos + bitolas
+    
+    3. **ENCONTRE CORRESPONDÊNCIAS:** 
+       - Compare o TOTAL AGRUPADO por bitola da Lista com o valor do Orçamento
+       - Seja FLEXÍVEL com nomenclaturas diferentes
+    
+    4. **COMPARE:** Quantidades totais por bitola
+    
+    5. **IDENTIFIQUE:**
+       - 🔴 Quantidades DIFERENTES para a mesma bitola
+       - 🟡 Bitolas na Lista mas NÃO no Orçamento (FALTANDO)
+       - 🔵 Bitolas no Orçamento mas NÃO na Lista (EXTRAS)
+    
+    FORMATO DE RESPOSTA (OBRIGATÓRIO):
+    
+    Para CABOS (AGRUPADOS POR BITOLA):
+    
+    BITOLA: [Ex: 16 mm²]
+    TOTAL LISTA: [soma de todas as cores] m
+    ORÇAMENTO: [quantidade] m
+    DIFERENÇA: [+/- valor da diferença]
+    STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
+    CORES ENCONTRADAS: [lista das cores com quantidades individuais]
+    
+    Para OUTROS MATERIAIS (não cabos):
+    
+    ITEM: [Nome completo do material]
+    LISTA DE MATERIAIS: [quantidade] [unidade]
+    ORÇAMENTO: [quantidade] [unidade]
+    DIFERENÇA: [+/- valor da diferença]
+    STATUS: [QUANTIDADE DIFERENTE / FALTANDO NO ORÇAMENTO / EXTRA NO ORÇAMENTO]
+    
+    EXEMPLOS DE CABOS AGRUPADOS:
+    
+    BITOLA: 16 mm²
+    TOTAL LISTA: 245.5 m
+    ORÇAMENTO: 245.5 m
+    DIFERENÇA: 0
+    STATUS: QUANTIDADE DIFERENTE
+    CORES ENCONTRADAS: Azul claro (51.2m), Branco (51.2m), Preto (51.2m), Verde-amarelo (51.2m), Vermelho (40.7m)
+    
+    BITOLA: 2.5 mm²
+    TOTAL LISTA: 180.0 m
+    ORÇAMENTO: 150.0 m
+    DIFERENÇA: -30.0
+    STATUS: QUANTIDADE DIFERENTE
+    CORES ENCONTRADAS: Azul (60m), Vermelho (60m), Verde-amarelo (60m)
+    
+    BITOLA: 25 mm²
+    TOTAL LISTA: 75.0 m
+    ORÇAMENTO: NÃO ENCONTRADO
+    DIFERENÇA: -75.0
+    STATUS: FALTANDO NO ORÇAMENTO
+    CORES ENCONTRADAS: Preto (75m)
+    
+    EXEMPLOS DE OUTROS MATERIAIS:
+    
+    ITEM: Luminária LED 20W
+    LISTA DE MATERIAIS: 25 un
+    ORÇAMENTO: NÃO ENCONTRADO
+    DIFERENÇA: -25
+    STATUS: FALTANDO NO ORÇAMENTO
+    
+    ITEM: Parafuso Sextavado
+    LISTA DE MATERIAIS: NÃO ENCONTRADO
+    ORÇAMENTO: 100 un
+    DIFERENÇA: +100
+    STATUS: EXTRA NO ORÇAMENTO
+    
+    REGRAS FINAIS:
+    1. Para CABOS: Agrupe por bitola, some quantidades, ignore cores
+    2. Para OUTROS MATERIAIS: Mantenha análise individual
+    3. Converta "pç" para "un" nas unidades
+    4. Seja FLEXÍVEL com nomenclaturas diferentes
+    5. Calcule TODAS as diferenças numéricas
+    6. Inclua TODOS os itens com divergência
+    7. Mantenha este formato exato
+    8. Ignore itens que estão iguais nos dois documentos
+    
+    IDENTIFIQUE PRIMEIRO TODOS OS CABOS POR BITOLA, DEPOIS ANALISE OS DEMAIS MATERIAIS:
+    
+    COMEÇE A ANÁLISE DETALHADA:`;
     }
 
     displayPrompt(prompt) {
